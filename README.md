@@ -81,6 +81,12 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 
 The Electron renderer is sandboxed with Node integration disabled and context isolation enabled. External sign-in links open in the normal browser. The desktop application includes only the compiled client and native shell; the optional profile service stays separate.
 
+Torrent playback is built into the x86-64 Linux app. Leave **Settings → Stremio streaming server** blank to use it. On first torrent playback, Still downloads the official Stremio Service 0.1.21 engine archive (about 62 MiB), verifies its pinned SHA-256, and installs the runtime and FFmpeg tools in its own application data directory (about 240 MiB installed). `dpkg-deb` must be available; it is included on Debian/Ubuntu systems. No separate Stremio application or profile service is required.
+
+The engine starts on demand on a private loopback port. Torrents use the addon's trackers and requested file index; an omitted index selects the largest file. Local playback uses the engine's HLS conversion, with H.264 and AAC/MP3 audio support. Unsupported audio such as AC3 is converted; demanding video conversions depend on the laptop's CPU. Persistent torrent caching is disabled. Temporary video/transcode files live in an isolated session directory and are removed when Still closes, along with its owned engine and conversion processes. The installed engine programs remain for future launches.
+
+The engine is downloaded directly from [Stremio's official distribution](https://github.com/Stremio/stremio-service), separately from Still's MIT application source. Upstream components retain their own licensing and copyright notices. Setting a remote streaming-server address overrides the local engine and uses that server's playback path instead.
+
 `npm run install:desktop` adds a per-user Applications-menu launcher and icon-theme assets pointing at the unpacked build. The Linux app ID and desktop entry both use `io.still.client` for correct dock grouping. Quit and reopen an already-running older version after updating its icon or app identity.
 
 All branded icons come from `src/assets/app-icon.svg`. PNG sizes for the window, dock, Linux package, Android and webOS are generated from that same squircle artwork. In-app controls use Lucide.
@@ -127,7 +133,7 @@ LG's CLI is isolated in `tools/webos/` and installed automatically by the webOS 
 ## Playback requirements and limits
 
 - HTTP(S) streams play directly when their codecs are supported by the device.
-- Torrent-only streams require a separately running, reachable Stremio streaming server; enter its address under Playback settings. Still does not embed a torrent engine.
+- Linux desktop handles torrent sources through its managed local engine. Browser, Android and webOS clients still need a reachable Stremio streaming server under Playback settings. Sharing a Windows or tailnet engine is separate from the Linux integration.
 - HLS works through native support or hls.js; Android also handles DASH through Media3. DRM-protected services are outside the addon playback contract.
 - Browser and webOS audio-track selection depends on the source/engine; automatic source filtering still requires matching audio metadata. Android selects the preferred track natively.
 - Browser/webOS external subtitles currently require WebVTT URLs and CORS. Android supports WebVTT and SubRip external tracks. ASS conversion is not implemented.

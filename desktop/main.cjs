@@ -1,10 +1,20 @@
-const { app, BrowserWindow, nativeImage, protocol, net, shell } = require("electron");
-const {readFileSync}=require('node:fs');
+const {
+  app,
+  BrowserWindow,
+  nativeImage,
+  protocol,
+  net,
+  shell,
+  ipcMain,
+} = require("electron");
+const { TorrentEngine } = require("./engine.cjs");
+const { ensureEngine } = require("./engine-install.cjs");
+const { readFileSync } = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 if (process.env.STILL_TEST_USER_DATA)
   app.setPath("userData", process.env.STILL_TEST_USER_DATA);
-if(process.platform==='linux')app.setDesktopName('io.still.client.desktop');
+if (process.platform === "linux") app.setDesktopName("io.still.client.desktop");
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "still",
@@ -18,6 +28,10 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 let window;
+let engine;
+let engineStart;
+const engineAbort = new AbortController();
+let quitting = false;
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on("second-instance", () => {
@@ -28,6 +42,33 @@ else {
     }
   });
   app.whenReady().then(() => {
+    ipcMain.handle("torrent-engine-url", (event) => {
+      if (
+        event.sender !== window?.webContents ||
+        !event.senderFrame.url.startsWith("still://app/")
+      )
+        throw new Error("Torrent engine access denied.");
+      if (!engineStart)
+        engineStart = (async () => {
+          const directory = await ensureEngine(
+            process.env.STILL_TEST_ENGINE_HOME || app.getPath("userData"),
+            undefined,
+            engineAbort.signal,
+          );
+          if (quitting) throw new Error("Still is closing.");
+          engine = new TorrentEngine(
+            directory,
+            app.isPackaged
+              ? path.join(process.resourcesPath, "engine-bootstrap.cjs")
+              : undefined,
+          );
+          return engine;
+        })().catch((error) => {
+          engineStart = null;
+          throw error;
+        });
+      return engineStart.then((engine) => engine.start());
+    });
     const root = path.resolve(__dirname, "../dist");
     protocol.handle("still", (request) => {
       try {
@@ -50,9 +91,12 @@ else {
       minHeight: 600,
       title: "Still",
       backgroundColor: "#f6f5f1",
-      icon: nativeImage.createFromBuffer(readFileSync(path.join(__dirname, "icon.png"))),
+      icon: nativeImage.createFromBuffer(
+        readFileSync(path.join(__dirname, "icon.png")),
+      ),
       autoHideMenuBar: true,
       webPreferences: {
+        preload: path.join(__dirname, "preload.cjs"),
         contextIsolation: true,
         sandbox: true,
         nodeIntegration: false,
@@ -83,4 +127,14 @@ else {
     void window.loadURL("still://app/index.html");
   });
   app.on("window-all-closed", () => app.quit());
+  app.on("before-quit", (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    quitting = true;
+    engineAbort.abort();
+    Promise.resolve(engineStart)
+      .catch(() => {})
+      .then(() => engine?.stop())
+      .finally(() => app.quit());
+  });
 }

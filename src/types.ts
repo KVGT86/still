@@ -27,7 +27,10 @@ export type Stream = {
   description?: string;
   url?: string;
   infoHash?: string;
-  fileIdx?: number;
+  fileIdx?: number | null;
+  sources?: string[];
+  announce?: string[];
+  fileMustInclude?: string[];
   subtitles?: { url: string; lang: string }[];
   behaviorHints?: {
     proxyHeaders?: { request?: Record<string, string> };
@@ -86,6 +89,7 @@ export type Addon = {
 };
 declare global {
   interface Window {
+    StillDesktop?: { engineURL: () => Promise<string> };
     PalmSystem?: { deviceInfo: string };
     StillNative?: {
       play: (payload: string) => void;

@@ -36,7 +36,9 @@ export function Player(p: Props) {
     [advanced, setAdvanced] = useState(false),
     [caption, setCaption] = useState(p.settings.subtitles),
     [countdown, setCountdown] = useState<number | null>(null),
-    [status, setStatus] = useState("Connecting…");
+    [status, setStatus] = useState(
+      p.source.infoHash ? "Finding peers and preparing video…" : "Connecting…",
+    );
   useEffect(() => {
     const v = video.current!;
     let hls: Hls | undefined;
@@ -130,7 +132,15 @@ export function Player(p: Props) {
             fail("HLS playback is unavailable on this device.");
             return;
           }
-          hls = new Hls();
+          hls = new Hls(
+            p.source.infoHash
+              ? {
+                  manifestLoadingTimeOut: 120000,
+                  levelLoadingTimeOut: 120000,
+                  fragLoadingTimeOut: 60000,
+                }
+              : {},
+          );
           hls.loadSource(p.url);
           hls.attachMedia(v);
           hls.on(Hls.Events.ERROR, (_, data) => {
@@ -139,9 +149,17 @@ export function Player(p: Props) {
         })
         .catch(() => fail("The HLS player could not be loaded."));
     } else v.src = p.url;
-    startup = setTimeout(() => {
-      if (!ready) fail("This source did not start within 30 seconds.");
-    }, 30000);
+    startup = setTimeout(
+      () => {
+        if (!ready)
+          fail(
+            p.source.infoHash
+              ? "This torrent did not start. Try a source with more peers."
+              : "This source did not start within 30 seconds.",
+          );
+      },
+      p.source.infoHash ? 120000 : 30000,
+    );
     return () => {
       disposed = true;
       write();

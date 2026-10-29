@@ -1,6 +1,7 @@
 import type { Addon, Meta, ProfileState, Session, Stream } from "./types";
 import { blankState, compactMeta, languageCode } from "../shared/domain.mjs";
 import WatchedBitfield from "stremio-watched-bitfield";
+import { torrentUrl, torrentHlsUrl } from "../shared/torrent.mjs";
 let catalogAuth = "";
 let addonCache: Addon[] = [];
 const metaCache = new Map<string, Meta>();
@@ -344,7 +345,7 @@ export function playUrl(stream: Stream, server: string) {
       throw new Error(
         "This source needs a Stremio streaming server. Set its address in Settings.",
       );
-    return `${safeBase(server)}/${encodeURIComponent(stream.infoHash)}/${stream.fileIdx ?? 0}`;
+    return torrentUrl(stream, safeBase(server));
   }
   if (!stream.url || !/^https?:\/\//i.test(stream.url))
     throw new Error("This source cannot be played by the built-in player.");
@@ -353,6 +354,14 @@ export function playUrl(stream: Stream, server: string) {
       "This source requires request headers. Choose another source or use Android.",
     );
   return stream.url;
+}
+export async function resolvePlayUrl(stream: Stream, server: string) {
+  if (stream.infoHash && !server.trim() && window.StillDesktop) {
+    const base = await window.StillDesktop.engineURL();
+    const media = playUrl(stream, base);
+    return torrentHlsUrl(media, base, crypto.randomUUID());
+  }
+  return playUrl(stream, server.trim());
 }
 export async function companion(
   base: string,

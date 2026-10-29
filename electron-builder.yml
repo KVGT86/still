@@ -13,6 +13,9 @@ files:
 nodeGypRebuild: false
 npmRebuild: false
 asar: true
+extraResources:
+  - from: desktop/engine-bootstrap.cjs
+    to: engine-bootstrap.cjs
 linux:
   executableName: still
   category: AudioVideo
