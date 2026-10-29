@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-webos/
+data/
+artifacts/
+.env
+android/.gradle/
+android/local.properties
+android/**/build/
+test-results/
+playwright-report/
+*.tsbuildinfo
+public/licenses/
+desktop/icon.png
+public/app-icon.png
+android/app/src/main/assets/
+android/app/src/main/res/drawable/icon.png

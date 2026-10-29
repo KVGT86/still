@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <title>Still</title>
+  <defs>
+    <linearGradient id="body" x1="80" y1="20" x2="440" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffef8"/>
+      <stop offset=".55" stop-color="#f2f3e9"/>
+      <stop offset="1" stop-color="#dce5d8"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="100" y1="30" x2="420" y2="490" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffef5" stop-opacity=".48"/>
+      <stop offset=".48" stop-color="#fffef5" stop-opacity=".04"/>
+      <stop offset="1" stop-color="#fffef5" stop-opacity=".16"/>
+    </linearGradient>
+  </defs>
+  <path d="M256 20C446 20 492 66 492 256C492 446 446 492 256 492C66 492 20 446 20 256C20 66 66 20 256 20Z" fill="url(#body)"/>
+  <path d="M256 23C444 23 489 68 489 256C489 444 444 489 256 489C68 489 23 444 23 256C23 68 68 23 256 23Z" stroke="url(#edge)" stroke-width="3"/>
+  <g transform="translate(112 112) scale(12)" stroke="#354c3c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 2a7 7 0 1 0 10 10"/>
+  </g>
+</svg>

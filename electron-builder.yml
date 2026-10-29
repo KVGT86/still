@@ -1,0 +1,20 @@
+appId: io.still.client
+productName: Still
+directories:
+  output: artifacts/linux
+  app: artifacts/linux/app
+files:
+  - dist/**/*
+  - desktop/**/*
+  - package.json
+  - LICENSE
+  - "!**/node_modules/**/*"
+# The desktop renderer is already bundled by Vite and needs no Node dependencies.
+nodeGypRebuild: false
+npmRebuild: false
+asar: true
+linux:
+  executableName: still
+  category: AudioVideo
+  icon: desktop/icon.png
+  artifactName: Still-${version}-linux-${arch}.${ext}

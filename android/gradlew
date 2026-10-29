@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+STILL_GRADLE_VERSION=8.11.1
+STILL_GRADLE_DIR="${GRADLE_USER_HOME:-$PWD/.gradle}/distributions"
+if [ ! -x "$STILL_GRADLE_DIR/gradle-$STILL_GRADLE_VERSION/bin/gradle" ]; then
+ mkdir -p "$STILL_GRADLE_DIR"
+ curl -fL "https://services.gradle.org/distributions/gradle-$STILL_GRADLE_VERSION-bin.zip" -o "$STILL_GRADLE_DIR/gradle.zip"
+ curl -fL "https://services.gradle.org/distributions/gradle-$STILL_GRADLE_VERSION-bin.zip.sha256" -o "$STILL_GRADLE_DIR/gradle.zip.sha256"
+ (cd "$STILL_GRADLE_DIR"; printf '%s  gradle.zip\n' "$(tr -d '\n' < gradle.zip.sha256)" | sha256sum -c -)
+ unzip -q -o "$STILL_GRADLE_DIR/gradle.zip" -d "$STILL_GRADLE_DIR"
+fi
+exec "$STILL_GRADLE_DIR/gradle-$STILL_GRADLE_VERSION/bin/gradle" "$@"
