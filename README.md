@@ -8,7 +8,7 @@ Still is an independent client, not an official Stremio product. It hosts no med
 
 ## Run locally
 
-Requires Node 22.13 or newer.
+Requires Node 22.16 or newer.
 
 ```sh
 npm ci
@@ -47,6 +47,8 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 Every app launch shows the profile chooser. Optional PINs protect profile entry and data reads. Editing or removing the PIN of a protected profile requires first unlocking it. Profile management otherwise has no owner/child roles. A PIN protects casual access in the app; an administrator with filesystem access to the server or device can inspect cached data.
 
 ## Self-host over Tailscale
+
+For a Windows host on E: with capped storage and an existing Stremio installation, see [Windows hosting](docs/windows-host.md). It includes automatic startup, persistent Saved/progress, seven daily SQLite snapshots and private HTTPS endpoints.
 
 ```sh
 docker compose up -d --build

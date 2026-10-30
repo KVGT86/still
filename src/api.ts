@@ -356,8 +356,11 @@ export function playUrl(stream: Stream, server: string) {
   return stream.url;
 }
 export async function resolvePlayUrl(stream: Stream, server: string) {
-  if (stream.infoHash && !server.trim() && window.StillDesktop) {
-    const base = await window.StillDesktop.engineURL();
+  if (stream.infoHash && !window.StillNative) {
+    const base = server.trim()
+      ? safeBase(server.trim())
+      : await window.StillDesktop?.engineURL();
+    if (!base) return playUrl(stream, "");
     const media = playUrl(stream, base);
     return torrentHlsUrl(media, base, crypto.randomUUID());
   }
