@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProfileState, Session } from "./types";
-import { blankState, mergeState } from "../shared/domain.mjs";
+import { blankState, changedMetas, mergeState } from "../shared/domain.mjs";
 import {
   companion,
   readLibrary,
@@ -15,6 +15,13 @@ export function readLocal<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
+const newest = (s: ProfileState) =>
+  Math.max(
+    0,
+    ...(["saved", "progress", "feedback"] as const).flatMap((f) =>
+      Object.values(s[f]).map((v) => v.updatedAt),
+    ),
+  );
 export function useProfileStore(
   session: Session | null,
   service: string,
@@ -30,7 +37,9 @@ export function useProfileStore(
   const dirty = useRef(false);
   const library = useRef<any[]>([]);
   const loaded = useRef(false);
+  const written = useRef(0);
   function install(value: ProfileState) {
+    if (value === ref.current) return;
     ref.current = value;
     setState(value);
     setStateKey(key);
@@ -72,6 +81,7 @@ export function useProfileStore(
             );
         if (alive) {
           install(mergeState(ref.current, incoming));
+          if (!service) written.current = newest(ref.current);
           loaded.current = true;
           setSyncStatus("");
         }
@@ -114,11 +124,7 @@ export function useProfileStore(
               localStorage.setItem(key + ":dirty", "false");
             }
           } else {
-            const metas = new Map();
-            for (const field of ["saved", "progress", "feedback"] as const)
-              for (const v of Object.values(sent[field]))
-                metas.set(v.meta.id, v.meta);
-            const changes = [...metas.values()].map((m) =>
+            const changes = changedMetas(sent, written.current).map((m) =>
               libraryChange(
                 m,
                 sent,
@@ -127,7 +133,12 @@ export function useProfileStore(
             );
             if (changes.length) await writeLibrary(session.authKey, changes);
             if (!alive) return;
-            library.current = changes;
+            const ids = new Set(changes.map((c) => c._id));
+            library.current = [
+              ...library.current.filter((x) => !ids.has(x._id)),
+              ...changes,
+            ];
+            written.current = Math.max(written.current, newest(sent));
             if (ref.current === sent) {
               dirty.current = false;
               localStorage.setItem(key + ":dirty", "false");
@@ -160,6 +171,7 @@ export function useProfileStore(
         if (alive) {
           library.current = items;
           install(mergeState(ref.current, importLibrary(items)));
+          written.current = newest(ref.current);
         }
       } catch {
         if (alive)
@@ -168,7 +180,11 @@ export function useProfileStore(
         working = false;
       }
     }, 15000);
-    const timer = setInterval(sync, 5000);
+    // Upload promptly after a change; otherwise only check the server every 30 seconds.
+    let idle = 0;
+    const timer = setInterval(() => {
+      if (dirty.current || ++idle % 6 === 0) void sync();
+    }, 5000);
     window.addEventListener("online", sync);
     return () => {
       alive = false;

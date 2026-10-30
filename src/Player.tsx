@@ -89,6 +89,7 @@ export function Player(p: Props) {
           subtitles: p.settings.subtitles,
           tracks: p.tracks,
           hasNext: !!p.onNext,
+          torrent: !!p.source.infoHash,
         }),
       );
       return () => {
@@ -182,7 +183,6 @@ export function Player(p: Props) {
     return () => clearTimeout(timer.current);
   }, [controls, playing, advanced]);
   useEffect(() => {
-    window.StillNative?.setSubtitles?.(JSON.stringify(p.tracks));
     const v = video.current;
     if (!v) return;
     for (const t of Array.from(v.textTracks))

@@ -157,18 +157,27 @@ export function sourceInfo(stream) {
   );
   return { quality, languages: [...new Set(languages)], peers };
 }
+const MIN_HEALTHY_PEERS = 15;
 export function rankSources(streams, audio, maxQuality) {
-  // Unknown language/resolution cannot prove mandatory constraints; keep it for manual selection.
+  // Unknown resolution cannot prove the quality ceiling; keep it for manual selection.
+  // Add-ons rarely tag English, so untagged sources count as English, ranked after tagged ones.
+  const wanted = languageCode(audio);
+  const tagged = (s) => s.info.languages.length > 0;
+  const healthy = (s) => s.info.peers >= MIN_HEALTHY_PEERS;
   return streams
     .map((s, i) => ({ ...s, key: s.key || String(i), info: sourceInfo(s) }))
     .filter(
       (s) =>
         s.info.quality > 0 &&
         s.info.quality <= maxQuality &&
-        s.info.languages.includes(languageCode(audio)),
+        (s.info.languages.includes(wanted) || (wanted === "en" && !tagged(s))),
     )
     .sort(
-      (a, b) => b.info.quality - a.info.quality || b.info.peers - a.info.peers,
+      (a, b) =>
+        healthy(b) - healthy(a) ||
+        tagged(b) - tagged(a) ||
+        b.info.quality - a.info.quality ||
+        b.info.peers - a.info.peers,
     );
 }
 export function mergeState(current, incoming) {
@@ -177,20 +186,38 @@ export function mergeState(current, incoming) {
     ...current,
     settings: { ...defaults, ...current.settings },
   };
+  // Return `current` itself when nothing is newer, so callers can skip saving and redrawing.
+  let changed =
+    !current.settings ||
+    Object.keys(defaults).some((k) => !(k in current.settings)) ||
+    ["saved", "progress", "feedback", "settingsAt"].some(
+      (k) => !(k in current),
+    );
   for (const field of ["saved", "progress", "feedback"]) {
     next[field] = { ...next[field] };
     for (const [key, item] of Object.entries(incoming[field] || {}))
       if (
         item &&
         Number(item.updatedAt) > Number(next[field][key]?.updatedAt || 0)
-      )
+      ) {
         next[field][key] = item;
+        changed = true;
+      }
   }
   if (Number(incoming.settingsAt) > Number(next.settingsAt)) {
     next.settings = { ...defaults, ...next.settings, ...incoming.settings };
     next.settingsAt = incoming.settingsAt;
+    changed = true;
   }
-  return next;
+  return changed ? next : current;
+}
+// Titles touched since the last Stremio library write; everything else is left alone.
+export function changedMetas(state, since) {
+  const metas = new Map();
+  for (const field of ["saved", "progress", "feedback"])
+    for (const v of Object.values(state[field]))
+      if (v.updatedAt > since) metas.set(v.meta.id, v.meta);
+  return [...metas.values()];
 }
 export function releasedEpisodes(meta, now = Date.now()) {
   return (meta.videos || [])
@@ -269,13 +296,16 @@ export function recommend(metas, state) {
     if (p.completed)
       for (const genre of p.meta.genres || [])
         affinities[genre] = (affinities[genre] || 0) + 1;
+  const finished = new Set(
+    Object.values(state.progress)
+      .filter((p) => p.completed)
+      .map((p) => p.meta.id),
+  );
   return metas
     .filter(
       (m) =>
         !["hide", "watched"].includes(state.feedback[m.id]?.value) &&
-        !Object.values(state.progress).some(
-          (p) => p.meta.id === m.id && p.completed && m.type === "movie",
-        ),
+        !(m.type === "movie" && finished.has(m.id)),
     )
     .map((m, i) => ({
       m,

@@ -6,6 +6,7 @@ import {
   continueItems,
   recordProgress,
   rankSources,
+  changedMetas,
   mergeState,
   recommend,
 } from "../shared/domain.mjs";
@@ -34,18 +35,63 @@ test("scheduled autoplay checks the 07:00 and 22:00 boundaries", () => {
   assert.equal(autoplayAllowed("on", new Date(2026, 0, 1, 23)), true);
   assert.equal(autoplayAllowed("off"), false);
 });
-test("automatic ranking requires known audio and quality; ceiling and peers apply", () => {
+test("automatic ranking needs a known resolution; healthy swarms and tagged audio come first", () => {
   const streams = [
-    { key: "4k", quality: 2160, languages: ["en"], seeders: 200 },
-    { key: "few", quality: 1080, languages: ["en"], seeders: 1 },
-    { key: "many", title: "1080p English 👤 40" },
-    { key: "unknown", title: "1080p multi", seeders: 500 },
-    { key: "french", quality: 1080, languages: ["fr"] },
+    { key: "4k-thin", quality: 2160, languages: ["en"], seeders: 3 },
+    { key: "1080-big", quality: 1080, languages: ["en"], seeders: 800 },
+    { key: "720-big", quality: 720, languages: ["en"], seeders: 500 },
+    { key: "untagged", title: "1080p WEB-DL 👤 900" },
+    { key: "no-res", title: "English", seeders: 900 },
+    { key: "french", quality: 1080, languages: ["fr"], seeders: 900 },
   ];
   assert.deepEqual(
-    rankSources(streams, "en", 1080).map((x) => x.key),
-    ["many", "few"],
+    rankSources(streams, "en", 2160).map((x) => x.key),
+    ["1080-big", "720-big", "untagged", "4k-thin"],
   );
+  assert.deepEqual(
+    rankSources(streams, "en", 1080).map((x) => x.key),
+    ["1080-big", "720-big", "untagged"],
+  );
+  assert.deepEqual(
+    rankSources(streams, "fr", 1080).map((x) => x.key),
+    ["french"],
+  );
+});
+test("merging an older copy returns the same object; newer data returns a new one", () => {
+  const a = mergeState(blankState(), {
+    ...blankState(),
+    saved: { x: { meta: { id: "x", type: "movie" }, updatedAt: 5 } },
+  });
+  assert.equal(mergeState(a, blankState()), a);
+  assert.equal(
+    mergeState(a, {
+      ...blankState(),
+      saved: { x: { ...a.saved.x, updatedAt: 4 } },
+    }),
+    a,
+  );
+  assert.notEqual(
+    mergeState(a, {
+      ...blankState(),
+      saved: { x: { ...a.saved.x, updatedAt: 6 } },
+    }),
+    a,
+  );
+});
+test("only titles changed since the last write are returned", () => {
+  const state = {
+    saved: { a: { meta: { id: "a" }, updatedAt: 10 } },
+    progress: {
+      b: { meta: { id: "b" }, updatedAt: 20 },
+      c: { meta: { id: "b" }, updatedAt: 30 },
+    },
+    feedback: {},
+  };
+  assert.deepEqual(
+    changedMetas(state, 15).map((m) => m.id),
+    ["b"],
+  );
+  assert.deepEqual(changedMetas(state, 30), []);
 });
 test("2% starts continuation; 95% completes and queues next released episode", () => {
   let s = recordProgress(blankState(), meta, "e1", 1, 100, 1);

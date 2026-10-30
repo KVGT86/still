@@ -70,12 +70,16 @@ export async function resource(
   type: string,
   id: string,
   extra = "",
+  timeout = 0,
 ) {
   const url = addon.transportUrl.replace(/\/manifest\.json(?:\?.*)?$/, "");
   return json(
     `${url}/${name}/${encodeURIComponent(type)}/${encodeURIComponent(id)}${extra ? "/" + extra : ""}.json`,
+    timeout ? { signal: AbortSignal.timeout(timeout) } : {},
   );
 }
+// One slow add-on must not hold up playback; catalogs and details keep the longer default.
+const FAST_ADDON_MS = 5000;
 function supports(addon: Addon, name: string, type: string, id = "") {
   return (addon.manifest.resources || []).some((r) =>
     typeof r === "string"
@@ -140,7 +144,7 @@ export async function streams(
   const results = await Promise.allSettled(
     addons
       .filter((a) => supports(a, "stream", type, id))
-      .map((a) => resource(a, "stream", type, id)),
+      .map((a) => resource(a, "stream", type, id, "", FAST_ADDON_MS)),
   );
   return results.flatMap((r, a) =>
     r.status === "fulfilled"
@@ -155,7 +159,7 @@ export async function subtitles(addons: Addon[], type: string, id: string) {
   const results = await Promise.allSettled(
     addons
       .filter((a) => supports(a, "subtitles", type, id))
-      .map((a) => resource(a, "subtitles", type, id)),
+      .map((a) => resource(a, "subtitles", type, id, "", FAST_ADDON_MS)),
   );
   return results.flatMap((r) =>
     r.status === "fulfilled" ? r.value.subtitles || [] : [],
@@ -218,7 +222,12 @@ export function importLibrary(items: any[]): ProfileState {
         for (const v of videos)
           if (bits.getVideo(v.id))
             state.progress[v.id] = {
-              meta: snapshot,
+              meta: {
+                id: meta.id,
+                type: meta.type,
+                name: meta.name,
+                genres: meta.genres,
+              },
               videoId: v.id,
               position: 0,
               duration: 0,
@@ -314,7 +323,7 @@ export function libraryChange(meta: Meta, state: ProfileState, original: any) {
             video_id: p.videoId,
             timesWatched: p.completed ? 1 : 0,
             flaggedWatched: p.completed ? 1 : 0,
-            lastWatched: new Date().toISOString(),
+            lastWatched: new Date(p.updatedAt).toISOString(),
           }
         : {}),
     },
