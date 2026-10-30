@@ -1,5 +1,9 @@
 # Still
 
+<p align="center">
+  <img src="src/assets/app-icon.svg" alt="Still app icon" width="120">
+</p>
+
 Still is a light-first, landscape Stremio client for Linux, Android TV, Google TV, Android tablets and LG webOS. It keeps Continue Watching prominent, removes most of the original interface clutter, and adds optional household profiles.
 
 Still is independent and is not an official Stremio product.
@@ -145,14 +149,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.1.1-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.1.2-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.1.1-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.1.2-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -203,7 +207,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.1.1_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.1.2_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 
