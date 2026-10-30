@@ -1,4 +1,40 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+async function capture(page: Page, path: string) {
+  await page.waitForFunction(() =>
+    Array.from(document.images).every((image) => image.complete),
+  );
+  await page.evaluate(() =>
+    Promise.all(
+      Array.from(document.images).map((image) =>
+        image.decode().catch(() => undefined),
+      ),
+    ),
+  );
+  await page.evaluate(() => {
+    const urls = Array.from(document.querySelectorAll("*"))
+      .flatMap((element) =>
+        Array.from(
+          getComputedStyle(element).backgroundImage.matchAll(
+            /url\(["']?([^"')]+)["']?\)/g,
+          ),
+        ),
+      )
+      .map((match) => match[1]);
+    return Promise.all(
+      urls.map(
+        (url) =>
+          new Promise<void>((resolve) => {
+            const image = new Image();
+            image.onload = image.onerror = () => resolve();
+            image.src = url;
+          }),
+      ),
+    );
+  });
+  await page.waitForTimeout(250);
+  await page.screenshot({ path });
+}
 test("preview navigates, saves titles, changes preferences and themes", async ({
   page,
 }) => {
@@ -8,15 +44,24 @@ test("preview navigates, saves titles, changes preferences and themes", async ({
     page.getByRole("heading", { name: "Continue watching" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Recommended", exact: true }).click();
+  await capture(page, "artifacts/recommended-light.png");
   await page.getByRole("button", { name: "Big Buck Bunny" }).click();
-  await page.screenshot({ path: "artifacts/details-glass.png" });
+  await capture(page, "artifacts/details-light.png");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.getByLabel("Search movies and series").fill("Big Buck Bunny");
+  await expect(
+    page.getByRole("button", { name: "Big Buck Bunny" }),
+  ).toBeVisible();
+  await capture(page, "artifacts/search-light.png");
   await page.getByRole("button", { name: "Saved", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Big Buck Bunny" }),
   ).toBeVisible();
+  await capture(page, "artifacts/saved-light.png");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await capture(page, "artifacts/settings-light.png");
   const toggle = page.getByRole("switch", { name: "Subtitles by default" });
   const knob = toggle.locator("span");
   const wasChecked = (await toggle.getAttribute("aria-checked")) === "true";
@@ -31,12 +76,31 @@ test("preview navigates, saves titles, changes preferences and themes", async ({
   );
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(
+    page.getByRole("button", { name: "Dark", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByLabel("Autoplay mode").selectOption("off");
   await expect(page.getByLabel("Autoplay mode")).toHaveValue("off");
-  await page.screenshot({ path: "artifacts/settings-dark.png" });
+  await capture(page, "artifacts/settings-dark.png");
+  await page.getByRole("button", { name: "Saved", exact: true }).click();
+  await expect(page.locator(".poster-card")).toHaveCount(1);
+  await capture(page, "artifacts/saved-dark.png");
+  await page.getByRole("button", { name: "Recommended", exact: true }).click();
+  await expect(page.locator(".poster-card")).toHaveCount(1);
+  await capture(page, "artifacts/recommended-dark.png");
+  await page.getByRole("button", { name: "Big Buck Bunny" }).click();
+  await capture(page, "artifacts/details-dark.png");
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Big Buck Bunny" }),
+  ).toBeVisible();
+  await expect(page.locator(".loading")).toHaveCount(0);
+  await capture(page, "artifacts/search-dark.png");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await page.getByRole("button", { name: "Home", exact: true }).click();
-  await page.screenshot({ path: "artifacts/home-light.png" });
+  await capture(page, "artifacts/home-light.png");
   await page
     .getByRole("button", {
       name: "Remove Big Buck Bunny from Continue Watching",
@@ -49,12 +113,14 @@ test("preview navigates, saves titles, changes preferences and themes", async ({
 test("Continue Watching tiers the latest item, next five and earlier items", async ({
   page,
 }) => {
+  const fixtureArtwork = `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><rect width="1600" height="900" fill="slategray"/><text x="800" y="470" fill="honeydew" font-family="sans-serif" font-size="64" font-weight="700" letter-spacing="12" text-anchor="middle">STILL PREVIEW</text></svg>',
+  )}`;
   const items = Array.from({ length: 8 }, (_, i) => ({
     _id: `fixture-${i}`,
     name: `Film ${i + 1}`,
     type: "movie",
-    poster:
-      "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+    poster: fixtureArtwork,
     _mtime: new Date(Date.UTC(2026, 9, 30, 12, 0, -i)).toISOString(),
     state: {
       video_id: `fixture-${i}`,
@@ -126,7 +192,11 @@ test("Continue Watching tiers the latest item, next five and earlier items", asy
   await expect(
     page.locator(".continue-card.featured").getByText("Film 1"),
   ).toBeVisible();
-  await page.screenshot({ path: "artifacts/continue-watching-tiers.png" });
+  await page.screenshot({ path: "artifacts/home-light.png" });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await capture(page, "artifacts/home-dark.png");
   await page
     .getByRole("button", { name: "Remove Film 1 from Continue Watching" })
     .click();
@@ -194,7 +264,11 @@ test("household profile chooser contains no real account data", async ({
   await expect(
     page.getByRole("button", { name: "Guest PIN protected" }),
   ).toBeVisible();
-  await page.screenshot({ path: "artifacts/profiles-light.png" });
+  await capture(page, "artifacts/profiles-light.png");
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  await capture(page, "artifacts/profiles-dark.png");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(
     page.getByRole("heading", { name: "Sign in to Stremio" }),

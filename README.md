@@ -67,6 +67,20 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 - Operate as a reliable offline library. The app assumes an internet connection.
 - Replace a VPN, debrid provider, torrent index or media server.
 
+## Interface gallery
+
+Every screenshot uses labelled fixture data. Light is the default theme; dark is available per device.
+
+| Page          | Light                                                            | Dark                                                           |
+| ------------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| Home          | ![Home in light mode](docs/images/home-light.png)                | ![Home in dark mode](docs/images/home-dark.png)                |
+| Recommended   | ![Recommended in light mode](docs/images/recommended-light.png)  | ![Recommended in dark mode](docs/images/recommended-dark.png)  |
+| Search        | ![Search in light mode](docs/images/search-light.png)            | ![Search in dark mode](docs/images/search-dark.png)            |
+| Saved         | ![Saved in light mode](docs/images/saved-light.png)              | ![Saved in dark mode](docs/images/saved-dark.png)              |
+| Settings      | ![Settings in light mode](docs/images/settings-light.png)        | ![Settings in dark mode](docs/images/settings-dark.png)        |
+| Title details | ![Title details in light mode](docs/images/details-light.png)    | ![Title details in dark mode](docs/images/details-dark.png)    |
+| Profiles      | ![Profile chooser in light mode](docs/images/profiles-light.png) | ![Profile chooser in dark mode](docs/images/profiles-dark.png) |
+
 ## Compatibility
 
 | Platform               | Status                                 | Player                             | Torrent-source requirement                           | Important limits                                                                    |
@@ -106,8 +120,6 @@ Use this when several people share one Stremio account but need separate Saved l
 6. Connect every Still device to the same service and choose the relevant profile.
 
 Household Saved titles, progress, preferences and recommendation feedback sync through the service. Household activity does not write back into the Stremio account. Disconnecting the service returns the app to the untouched single-profile Stremio path.
-
-![Still household profile chooser with one open and one PIN-protected profile](docs/images/profiles-light.png)
 
 The service has no administrator, owner or child role. Anyone with the account-level service session can list and create profiles. A PIN protects that profile's state through the app, but a server or device administrator can still inspect local data.
 
@@ -228,8 +240,6 @@ The optional service stores the verified Stremio account ID, profile names and a
 Addon operators receive the catalogue, metadata, search and stream requests needed to answer the app. Media hosts and torrent peers receive the normal network traffic required for playback.
 
 Read [SECURITY.md](SECURITY.md) before running a public fork. The intended deployment boundary is a private tailnet or explicitly trusted LAN, not the open internet.
-
-![Still playback and appearance settings in dark mode](docs/images/settings-dark.png)
 
 ## Playback requirements and limits
 
