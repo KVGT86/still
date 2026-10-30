@@ -8,6 +8,7 @@ import type {
   Episode,
   Meta,
   Profile,
+  Progress,
   ProfileState,
   Session,
   Stream,
@@ -78,6 +79,81 @@ function detectedQuality() {
       JSON.parse(window.PalmSystem?.deviceInfo || "{}").screenWidth || width;
   } catch {}
   return width >= 3840 ? 2160 : width >= 1920 ? 1080 : 720;
+}
+function ContinueCard({
+  item,
+  variant = "standard",
+  disabled,
+  onPlay,
+  onRemove,
+}: {
+  item: Progress;
+  variant?: "featured" | "recent" | "standard";
+  disabled: boolean;
+  onPlay: () => void;
+  onRemove: () => void;
+}) {
+  const remaining = item.duration
+    ? `${Math.max(1, Math.ceil((item.duration - item.position) / 60))} min remaining`
+    : "Up next";
+  return (
+    <article className={`continue-card ${variant}`}>
+      <button
+        className="art-button"
+        disabled={disabled}
+        onClick={onPlay}
+        style={{
+          backgroundImage: `url("${item.meta.background || item.meta.poster || ""}")`,
+        }}
+        aria-label={`Continue ${item.meta.name}`}
+      >
+        <div className="art-shade" />
+        <span className="media-label">
+          {item.meta.type === "series" ? "SERIES" : "FILM"}
+        </span>
+        <span className="art-play">
+          <Icon name="play" size={variant === "recent" ? 16 : 20} />
+        </span>
+        {item.queued && <span className="new-episode">NEXT EPISODE</span>}
+        <div className="art-title">
+          <span>
+            {item.meta.genres?.slice(0, 2).join(" / ") ||
+              (item.meta.type === "series" ? "Series" : "Film")}
+          </span>
+          <h2>{item.meta.name}</h2>
+        </div>
+        <div className="progress-line">
+          <span
+            style={{
+              width: `${Math.max(2, (item.position / (item.duration || 1)) * 100)}%`,
+            }}
+          />
+        </div>
+      </button>
+      <div className="card-caption">
+        <div>
+          <strong>
+            {item.queued
+              ? "Next episode"
+              : item.meta.type === "series"
+                ? item.videoId.split(":").length > 2
+                  ? "Episode " + item.videoId.split(":").at(-1)
+                  : "Continue episode"
+                : "Continue film"}
+          </strong>
+          <small>{remaining}</small>
+        </div>
+        <button
+          className="text-button remove"
+          aria-label={`Remove ${item.meta.name} from Continue Watching`}
+          onClick={onRemove}
+        >
+          <Icon name="close" size={15} />
+          <span>Remove</span>
+        </button>
+      </div>
+    </article>
+  );
 }
 function App() {
   const [session, setSession] = useState<Session | null>(
@@ -550,6 +626,8 @@ function App() {
     }));
   }
   const continuation = continueItems(data) as any[];
+  const recentContinuation = continuation.slice(1, 6);
+  const earlierContinuation = continuation.slice(6);
   const titles =
     page === "Saved"
       ? Object.values(data.saved)
@@ -743,78 +821,51 @@ function App() {
                 {page === "Home" ? (
                   continuation.length ? (
                     <>
-                      <div className="continue-grid">
-                        {continuation.map((p, i) => (
-                          <article
-                            className={`continue-card ${i === 0 ? "featured" : ""}`}
-                            key={p.videoId}
-                          >
-                            <button
-                              className="art-button"
-                              onClick={() => void open(p.meta)}
-                              style={{
-                                backgroundImage: `url("${p.meta.background || p.meta.poster || ""}")`,
-                              }}
-                              aria-label={`Continue ${p.meta.name}`}
-                            >
-                              <div className="art-shade" />
-                              <span className="media-label">
-                                {p.meta.type === "series" ? "SERIES" : "FILM"}
-                              </span>
-                              <span className="art-play">
-                                <Icon name="play" size={20} />
-                              </span>
-                              {p.queued && (
-                                <span className="new-episode">
-                                  NEXT EPISODE
-                                </span>
-                              )}
-                              <div className="art-title">
-                                <span>
-                                  {p.meta.genres?.slice(0, 2).join(" / ") ||
-                                    (p.meta.type === "series"
-                                      ? "Series"
-                                      : "Film")}
-                                </span>
-                                <h2>{p.meta.name}</h2>
-                              </div>
-                              <div className="progress-line">
-                                <span
-                                  style={{
-                                    width: `${Math.max(2, (p.position / (p.duration || 1)) * 100)}%`,
-                                  }}
-                                />
-                              </div>
-                            </button>
-                            <div className="card-caption">
-                              <div>
-                                <strong>
-                                  {p.queued
-                                    ? "Next episode"
-                                    : p.meta.type === "series"
-                                      ? p.videoId.split(":").length > 2
-                                        ? "Episode " +
-                                          p.videoId.split(":").at(-1)
-                                        : "Continue episode"
-                                      : "Continue film"}
-                                </strong>
-                                <small>
-                                  {p.duration
-                                    ? `${Math.max(1, Math.ceil((p.duration - p.position) / 60))} min remaining`
-                                    : "Up next"}
-                                </small>
-                              </div>
-                              <button
-                                className="text-button remove"
-                                aria-label={`Remove ${p.meta.name} from Continue Watching`}
-                                onClick={() => hide(p.videoId)}
-                              >
-                                <Icon name="close" size={17} />
-                              </button>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
+                      <ContinueCard
+                        item={continuation[0]}
+                        variant="featured"
+                        disabled={resolving}
+                        onPlay={() =>
+                          void launch(
+                            continuation[0].meta,
+                            continuation[0].videoId,
+                          )
+                        }
+                        onRemove={() => hide(continuation[0].videoId)}
+                      />
+                      {!!recentContinuation.length && (
+                        <section className="continue-tier">
+                          <h2>Recently watched</h2>
+                          <div className="continue-row">
+                            {recentContinuation.map((p) => (
+                              <ContinueCard
+                                item={p}
+                                variant="recent"
+                                disabled={resolving}
+                                key={p.videoId}
+                                onPlay={() => void launch(p.meta, p.videoId)}
+                                onRemove={() => hide(p.videoId)}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      )}
+                      {!!earlierContinuation.length && (
+                        <section className="continue-tier">
+                          <h2>Earlier</h2>
+                          <div className="continue-grid">
+                            {earlierContinuation.map((p) => (
+                              <ContinueCard
+                                item={p}
+                                disabled={resolving}
+                                key={p.videoId}
+                                onPlay={() => void launch(p.meta, p.videoId)}
+                                onRemove={() => hide(p.videoId)}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      )}
                     </>
                   ) : (
                     <Empty
@@ -1649,6 +1700,7 @@ function Settings(p: any) {
           <button
             className="toggle"
             role="switch"
+            aria-label="Subtitles by default"
             aria-checked={data.settings.subtitles}
             onClick={() => set("subtitles", !data.settings.subtitles)}
           >
@@ -1738,7 +1790,7 @@ function Settings(p: any) {
         )}
       </section>
       <p className="fine-print">
-        Still 0.1.0 · An independent Stremio client.
+        Still 0.1.1 · An independent Stremio client.
         <br />
         Configured addons supply catalogs and sources. No content is hosted by
         Still.

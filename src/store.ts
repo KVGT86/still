@@ -73,7 +73,7 @@ export function useProfileStore(
       alive = false;
       loaded.current = false;
     };
-  }, [key, session?.authKey, profileToken]);
+  }, [key, session?.authKey, profileId, profileToken]);
   useEffect(() => {
     if (!session || !profileId) return;
     let working = false,
@@ -162,7 +162,7 @@ export function useProfileStore(
       clearInterval(poll);
       window.removeEventListener("online", sync);
     };
-  }, [key, session?.authKey, profileToken]);
+  }, [key, session?.authKey, profileId, profileToken]);
   function update(fn: (current: ProfileState) => ProfileState) {
     const next = fn(ref.current);
     dirty.current = true;

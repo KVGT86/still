@@ -1,6 +1,7 @@
-import { access, cp, mkdir, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { icon } from "./shared-icon.mjs";
+const { version } = JSON.parse(await readFile("package.json", "utf8"));
 await mkdir("artifacts/webos", { recursive: true });
 execFileSync(process.execPath, ["scripts/notices.mjs"], { stdio: "inherit" });
 execFileSync(process.execPath, ["scripts/generate-icons.mjs"], {
@@ -27,7 +28,7 @@ await writeFile(
   JSON.stringify(
     {
       id: "io.still.client",
-      version: "0.1.0",
+      version,
       vendor: "Still contributors",
       type: "web",
       main: "index.html",

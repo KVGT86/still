@@ -122,7 +122,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec/firmware 
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.1.0_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.1.1_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 

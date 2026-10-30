@@ -458,11 +458,21 @@ main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 32px 24px;
 }
+.continue-tier {
+  margin-top: 48px;
+}
+.continue-tier > h2 {
+  margin-bottom: 18px;
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+.continue-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
 .continue-card {
   min-width: 0;
-}
-.continue-card.featured {
-  grid-column: span 2;
 }
 .art-button {
   position: relative;
@@ -481,6 +491,9 @@ main {
 .featured .art-button {
   aspect-ratio: 2.75;
   background-position: center 44%;
+}
+.recent .art-button {
+  aspect-ratio: 1.55;
 }
 .art-shade {
   position: absolute;
@@ -559,6 +572,46 @@ main {
   justify-content: space-between;
   padding: 17px 4px 4px;
 }
+.recent .card-caption {
+  align-items: flex-start;
+  padding-top: 12px;
+}
+.recent .card-caption strong,
+.recent .card-caption small {
+  overflow: hidden;
+  display: block;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent .card-caption > div {
+  min-width: 0;
+}
+.recent .media-label,
+.recent .art-title > span,
+.recent .new-episode {
+  display: none;
+}
+.recent .art-title {
+  left: 14px;
+  right: 12px;
+  bottom: 14px;
+  padding-right: 32px;
+}
+.recent .art-title h2 {
+  margin: 0;
+  font-size: clamp(13px, 1.3vw, 18px);
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent .art-play {
+  right: 12px;
+  bottom: 12px;
+  width: 30px;
+  height: 30px;
+}
 .card-caption strong {
   font-size: 12px;
 }
@@ -568,7 +621,11 @@ main {
   margin-top: 6px;
 }
 .remove {
-  font-size: 22px;
+  flex-shrink: 0;
+  font-size: 10px;
+  gap: 4px;
+  min-height: 36px;
+  padding: 8px;
 }
 .quiet-note {
   text-align: center;
@@ -729,10 +786,13 @@ main {
 }
 .toggle {
   width: 48px;
+  height: 28px;
+  display: block;
   padding: 4px;
   border: 0;
   background: var(--soft);
   border-radius: 30px;
+  overflow: hidden;
 }
 .toggle span {
   display: block;
@@ -741,6 +801,7 @@ main {
   border-radius: 50%;
   background: var(--panel);
   box-shadow: 0 1px 5px #0003;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .toggle[aria-checked="true"] {
   background: #6f866a;
@@ -1343,6 +1404,9 @@ form .primary {
   .card-caption small {
     font-size: 14px;
   }
+  .continue-row {
+    gap: 22px;
+  }
   .art-button {
     border-radius: 20px;
   }
@@ -1408,6 +1472,16 @@ form .primary {
   }
   .featured .art-button {
     aspect-ratio: 2.15;
+  }
+  .continue-row {
+    gap: 10px;
+  }
+  .recent .card-caption {
+    display: block;
+  }
+  .recent .remove {
+    margin-top: 3px;
+    padding-left: 0;
   }
   .login-panel {
     padding: 30px 4vw;
