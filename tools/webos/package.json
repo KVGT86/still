@@ -1,0 +1,1 @@
+{"name":"still-webos-build-tools","version":"0.1.0","private":true,"description":"Isolated LG packaging and device CLI; never deployed with Still","dependencies":{"@webos-tools/cli":"3.2.6"}}
