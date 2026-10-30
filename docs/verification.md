@@ -20,7 +20,7 @@
 
 Docker image execution was not tested in this environment; the Docker Compose plugin is unavailable. The standalone service API is covered by the integration test.
 
-No Stremio account credentials, private addon configuration or physical TV/tablet access were supplied. The Windows service and engine were deployed and tested over Tailscale and the home LAN. Account tests use labelled fixtures and the preview uses the Blender Foundation's film; they do not exercise every real addon or codec.
+No credentials, private addon URLs, personal network addresses or viewing history are recorded in the repository. The Windows service and engine were tested over private Tailscale and LAN paths. Account tests use labelled fixtures and the preview uses the Blender Foundation's film; they do not exercise every real addon, physical device or codec.
 
 On each device:
 

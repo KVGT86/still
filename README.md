@@ -1,34 +1,48 @@
 # Still
 
-A quieter place for your Stremio stories. Light by default, focused on Continue Watching, and built for the sofa and a landscape tablet.
+Still is a light-first, landscape Stremio client for Linux, Android TV, Google TV, Android tablets and LG webOS. It keeps Continue Watching prominent, removes most of the original interface clutter, and adds optional household profiles.
 
-Still is an independent client, not an official Stremio product. It hosts no media, installs no addons, and uses the addons already attached to your Stremio account. Only play content you are entitled to access.
+Still is independent and is not an official Stremio product.
 
-![Still's light interface, showing the clearly labelled preview](docs/images/home-light.png)
+![Still showing the latest item, five recent items and earlier viewing history](docs/images/home-light.png)
 
-## Run locally
+## Read this first
 
-Requires Node 22.16 or newer.
+Still is an interface and playback client for the Stremio account and addon ecosystem. It does not give you movies, illegal torrents, subscription access or preconfigured addons.
+
+- Still uses the addons already configured on your Stremio account.
+- Still does not run a torrent index, tracker or content catalogue.
+- Still does not host media or bypass DRM and subscription checks.
+- A torrent source still requires a Stremio streaming engine. The Linux app can start the official Stremio Service locally; other platforms need a reachable engine.
+- A BitTorrent engine may download and upload pieces while a torrent is active. Only use sources you are legally entitled to access.
+- Addons are third-party services. Their availability, privacy practices and returned content are outside Still's control.
+
+Configure addons through the standard Stremio web or desktop app first. Still reads that existing addon collection after sign-in.
+
+## Install from source
+
+All builds require Node.js 22.16 or newer and Git.
 
 ```sh
+git clone https://github.com/KVGT86/still.git
+cd still
 npm ci
+npm run check
+```
+
+For a quick browser preview:
+
+```sh
 npm run dev
 ```
 
 Open `http://localhost:5173`. Sign in with Stremio using the QR link or email/password. **Preview app** opens an explicitly labelled preview with Blender Foundation's Big Buck Bunny; it never touches a Stremio account.
 
-```sh
-npm run check
-npm exec -- playwright test
-npm run build
-npm run preview
-```
+Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium` and install Playwright Chromium if preferred. Production builds use `npm run build`; `npm run preview` serves that output locally.
 
-Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium` and install Playwright Chromium if preferred.
+## What Still can do
 
-## What is included
-
-- Home containing Continue Watching only; Recommended, Search, Saved and Settings.
+- Home containing a large latest item, five recent items, then earlier viewing history; Recommended, Search, Saved and Settings stay in the sidebar.
 - Stremio login and QR linking, existing addon catalogs, metadata, episodes, streams and subtitles.
 - Automatic source selection with mandatory known audio language and a device quality ceiling. Unknown metadata is kept for manual selection. Highest resolution within the ceiling is preferred, then reported peers/seeders; this is availability metadata, not telemetry gathered from other Still users.
 - Automatic fallback through matching sources, then a complete manual list with failures marked.
@@ -38,13 +52,60 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 - Light and neutral dark themes, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
 - Android's built-in Media3 player; browser/webOS HTML video with HLS fallback.
 
-## Two account modes
+## What Still cannot do
 
-**Single profile:** works with no Still service. Library and playback state sync with Stremio. Device-local settings and recommendation feedback are retained on that device. Stremio's watched-episode bitfield is preserved when updating a series.
+- Install, configure or recommend addons for you.
+- Guarantee that a source is legal, safe, online or correctly labelled.
+- Play DRM-protected services outside the Stremio addon playback contract.
+- Make every codec, HDR format, subtitle format or audio track work on every device.
+- Put Tailscale on an LG television. The LG app needs a local-network engine or a tailnet-capable gateway.
+- Provide child accounts, parental controls or owner roles. Profile PINs only discourage casual access.
+- Operate as a reliable offline library. The app assumes an internet connection.
+- Replace a VPN, debrid provider, torrent index or media server.
 
-**Household profiles:** connect the optional Still service in Settings. The first profile imports the Stremio library and progress. Additional profiles start empty. Saved titles, progress, preferences and feedback are independent, synchronized through the service, and do not write back to Stremio. Disconnecting the service restores the original Stremio state without merging household activity.
+## Compatibility
 
-Every app launch shows the profile chooser. Optional PINs protect profile entry and data reads. Editing or removing the PIN of a protected profile requires first unlocking it. Profile management otherwise has no owner/child roles. A PIN protects casual access in the app; an administrator with filesystem access to the server or device can inspect cached data.
+| Platform               | Status                                 | Player                             | Torrent-source requirement                           | Important limits                                                                    |
+| ---------------------- | -------------------------------------- | ---------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Linux x86-64           | Supported                              | Electron video with HLS conversion | Built-in managed Stremio Service, or a remote engine | Local engine requires `dpkg-deb`; installed engine files use about 240 MiB          |
+| Android TV / Google TV | Supported on Android 8+                | Native Media3                      | Reachable Stremio streaming engine                   | Sideloaded APK; remote-control navigation is supported                              |
+| Android tablet         | Supported on Android 8+                | Native Media3                      | Reachable Stremio streaming engine                   | Landscape only; tested layout target is Galaxy Tab S7                               |
+| LG webOS               | Targeted at webOS 22+                  | Native browser video and HLS       | LAN engine or tailnet gateway                        | Developer Mode sideloads expire; codecs and Magic Remote behaviour vary by firmware |
+| Desktop browser        | Development and self-hosted web client | Browser video and hls.js           | Reachable Stremio streaming engine                   | Browser CORS, mixed-content and codec rules still apply                             |
+| Windows                | Host only                              | Reuses an installed Stremio engine | Existing Stremio installation                        | No native Windows Still shell yet; use the hosted web client                        |
+
+HTTP(S) streams can play directly when the device supports their codecs. Android can also handle DASH through Media3. Browser and webOS external subtitles currently require CORS-enabled WebVTT URLs. Android accepts WebVTT and SubRip. ASS conversion is not implemented.
+
+## Choose an account setup
+
+### Path A: one profile, no server
+
+Use this when one person uses the Stremio account.
+
+1. Configure addons in the standard Stremio app.
+2. Install Still on each device.
+3. Sign in to the same Stremio account on each device.
+4. Leave **Settings > Household profiles** disconnected.
+5. On Linux, leave **Stremio streaming server** blank to use the local engine. On Android, browser or webOS, enter a reachable Stremio engine URL for torrent sources.
+
+Saved titles and playback state use Stremio's library. Stremio's watched-episode bitfield is preserved when a series is updated. Audio, subtitle, autoplay and recommendation-feedback settings remain local to each device. No companion database is required.
+
+### Path B: synchronized household profiles
+
+Use this when several people share one Stremio account but need separate Saved lists and viewing history.
+
+1. Deploy the optional profile service using Docker or the Windows host guide below.
+2. Keep it private through Tailscale or an explicitly trusted home LAN. Do not expose the service or streaming engine directly to the public internet.
+3. In Still, open **Settings > Household profiles > Connect service** and enter the service URL. Enter a URL, not a folder or database file.
+4. The first profile imports the current Stremio Saved list and progress.
+5. Add the remaining profiles. They begin empty and can have optional 4 to 8 digit PINs.
+6. Connect every Still device to the same service and choose the relevant profile.
+
+Household Saved titles, progress, preferences and recommendation feedback sync through the service. Household activity does not write back into the Stremio account. Disconnecting the service returns the app to the untouched single-profile Stremio path.
+
+![Still household profile chooser with one open and one PIN-protected profile](docs/images/profiles-light.png)
+
+The service has no administrator, owner or child role. Anyone with the account-level service session can list and create profiles. A PIN protects that profile's state through the app, but a server or device administrator can still inspect local data.
 
 ## Self-host over Tailscale
 
@@ -81,6 +142,20 @@ npm run package:linux
 
 The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debian `.deb`, and an unpacked executable at `artifacts/linux/linux-unpacked/still`. The desktop app has its own window and persistent profile storage; it does not require the local preview server to run. Sign in again inside the desktop app because its storage is independent of the browser preview.
 
+Install the Debian package on Debian or Ubuntu:
+
+```sh
+sudo apt install ./artifacts/linux/Still-0.1.1-linux-amd64.deb
+```
+
+Or extract and run the portable package:
+
+```sh
+mkdir -p Still
+tar -xzf artifacts/linux/Still-0.1.1-linux-x64.tar.gz -C Still
+./Still/still
+```
+
 The Electron renderer is sandboxed with Node integration disabled and context isolation enabled. External sign-in links open in the normal browser. The desktop application includes only the compiled client and native shell; the optional profile service stays separate.
 
 Torrent playback is built into the x86-64 Linux app. Leave **Settings → Stremio streaming server** blank to use it. On first torrent playback, Still downloads the official Stremio Service 0.1.21 engine archive (about 62 MiB), verifies its pinned SHA-256, and installs the runtime and FFmpeg tools in its own application data directory (about 240 MiB installed). `dpkg-deb` must be available; it is included on Debian/Ubuntu systems. No separate Stremio application or profile service is required.
@@ -112,11 +187,17 @@ sh gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The launcher appears on both TV and tablet. Landscape is enforced. The bundled client is served from Android's secure asset origin. Only bundled UI pages load inside the WebView; native playback uses Media3 with preferred audio/text language selection and request headers. The debug APK is for personal sideloading. Sign a release build with your own key for a long-lived release identity.
+For wireless TV installation, enable Developer options and Wireless debugging, pair with `adb pair TV_IP:PAIRING_PORT`, connect with `adb connect TV_IP:CONNECTION_PORT`, then install with:
+
+```sh
+adb -s TV_IP:CONNECTION_PORT install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+The launcher appears on both TV and tablet. Landscape is enforced. The bundled client is served from Android's secure asset origin. Only bundled UI pages load inside the WebView; local file and content access are disabled, and native playback uses Media3 with preferred audio/text language selection and request headers. The debug APK is for personal sideloading. Sign a release build with a protected key and stable version code before distributing public releases.
 
 ## LG webOS
 
-The initial engine target is **webOS 22+** (Chromium 87+); exact codec/firmware behavior needs testing on the real TV.
+The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmware behavior needs testing on the real TV. Install LG's Developer Mode app, sign in, enable Developer Mode, and keep its session renewed before using the CLI.
 
 ```sh
 npm ci
@@ -132,6 +213,20 @@ webOS uses a classic IIFE JavaScript bundle rather than ES module script tags, b
 
 LG's CLI is isolated in `tools/webos/` and installed automatically by the webOS packaging command. Its upstream dependency tree currently has security advisories; it is used only for local packaging/device operations and is never included in the application or companion-service image. Do not run its optional development servers on an untrusted network.
 
+The LG app cannot run Tailscale itself. Use the Windows host's explicitly enabled LAN URLs when the television and server share a trusted network. Otherwise, provide a Tailscale-capable router or gateway. Never forward the profile-service or streaming-engine ports directly to the public internet.
+
+## Stored data and security
+
+The client keeps its Stremio session, service address, service token, device settings and cached profile state in platform local storage. These values are inside the browser or app sandbox, but they are not protected by an operating-system keychain. Sign out and clear the app's storage before sharing or transferring a device or operating-system account.
+
+The optional service stores the verified Stremio account ID, profile names and avatars, salted scrypt PIN hashes, hashed expiring service tokens, Saved titles, playback progress, preferences and recommendation feedback. It does not persist the Stremio password or raw authentication key, and it does not store videos or downloaded artwork.
+
+Addon operators receive the catalogue, metadata, search and stream requests needed to answer the app. Media hosts and torrent peers receive the normal network traffic required for playback.
+
+Read [SECURITY.md](SECURITY.md) before running a public fork. The intended deployment boundary is a private tailnet or explicitly trusted LAN, not the open internet.
+
+![Still playback and appearance settings in dark mode](docs/images/settings-dark.png)
+
 ## Playback requirements and limits
 
 - HTTP(S) streams play directly when their codecs are supported by the device.
@@ -142,7 +237,18 @@ LG's CLI is isolated in `tools/webos/` and installed automatically by the webOS 
 - An HTTPS-hosted client requires HTTPS media/server endpoints unless the platform permits mixed content. Prefer HTTPS tailnet service URLs.
 - Resolution detection reflects the current display mode, not a guarantee about every codec/HDR combination. Lower the per-device ceiling if required.
 - LG uses the native device video width rather than the app's graphics resolution; a 1080p app surface can therefore still select 4K video on a UHD television.
-- Actual account/addon compatibility and codec behavior require device testing. No credentials, private addon URLs, or TV connection were supplied during development.
+- Actual account, addon, codec and remote-control behavior still requires testing on each physical device. Automated tests use reserved fixture accounts, domains and media.
+
+## Security review status
+
+- No personal usernames, home paths, IP addresses, tailnet names, credentials, signing keys or real addon URLs are tracked in the repository.
+- The client and service dependency graph currently reports no known npm advisories.
+- The Electron renderer uses context isolation, sandboxing, disabled Node integration, denied permission requests and a restricted custom protocol.
+- Bundled clients use a Content Security Policy that permits network data and media but only permits scripts from the packaged app.
+- The profile API validates state size and shape, namespaces data by verified Stremio account, hashes tokens, rate-limits sign-in and PIN attempts, and does not use cookie authentication.
+- The isolated LG packaging CLI currently has upstream dependency advisories. It is not included in Still packages or the profile-service image. Do not expose its optional development servers to an untrusted network.
+
+This review does not certify third-party addons, the upstream Stremio engine, torrent peers, media URLs, operating systems or device firmware.
 
 ## Repository layout
 

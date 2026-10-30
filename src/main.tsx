@@ -420,6 +420,18 @@ function App() {
     setSession(value);
     setError("");
   }
+  function signOut() {
+    if (service && serviceToken)
+      void api
+        .companion(service, "/session/revoke", serviceToken, {})
+        .catch(() => {});
+    setSession(null);
+    setActive(null);
+    setProfileToken("");
+    setServiceToken("");
+    localStorage.removeItem("still.session");
+    localStorage.removeItem("still.serviceToken");
+  }
   function startDemo() {
     setDemo(true);
     setActive({ id: "preview", name: "Preview", avatar: "◒", locked: false });
@@ -688,13 +700,7 @@ function App() {
               <button onClick={() => setDialog("service")}>
                 {service ? "Connection settings" : "Set up household profiles"}
               </button>
-              <button
-                className="text-button"
-                onClick={() => {
-                  setSession(null);
-                  localStorage.removeItem("still.session");
-                }}
-              >
+              <button className="text-button" onClick={signOut}>
                 Sign out
               </button>
             </div>

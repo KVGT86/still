@@ -53,7 +53,12 @@ export function createApp({
         "Content-Type, Authorization, X-Profile-Token",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Cache-Control": "no-store",
+      "Content-Security-Policy":
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https: http:; media-src 'self' blob: https: http:; connect-src 'self' https: http:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+      "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
     });
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
@@ -101,15 +106,21 @@ export function createApp({
   });
   app.use("/api", (req, res, next) => {
     const token = (req.get("Authorization") || "").replace(/^Bearer /, "");
+    const tokenHash = digest(token);
     const session = db
       .prepare("SELECT * FROM sessions WHERE token=? AND expires>?")
-      .get(digest(token), Date.now());
+      .get(tokenHash, Date.now());
     if (!session)
       return res
         .status(401)
         .json({ error: "Sign in again to reconnect the profile service." });
     req.account = session.account;
+    req.sessionToken = tokenHash;
     next();
+  });
+  app.post("/api/session/revoke", (req, res) => {
+    db.prepare("DELETE FROM sessions WHERE token=?").run(req.sessionToken);
+    res.json({ ok: true });
   });
   const list = (account) =>
     db.prepare("SELECT * FROM profiles WHERE account=?").all(account);
