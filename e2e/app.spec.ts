@@ -186,7 +186,7 @@ test("Continue Watching tiers the latest item, next five and earlier items", asy
   await page.getByLabel("Email address").fill("tier@example.test");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("button", { name: "tier Profile" }).click();
+  await page.getByRole("button", { name: "tier" }).click();
   await expect(page.locator(".continue-card.featured")).toHaveCount(1);
   await expect(page.locator(".continue-row .continue-card")).toHaveCount(5);
   await expect(page.locator(".continue-grid .continue-card")).toHaveCount(2);
@@ -259,9 +259,7 @@ test("household profile chooser contains no real account data", async ({
   await expect(
     page.getByRole("heading", { name: "Who’s watching?" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Living room Profile" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Living room" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Guest PIN protected" }),
   ).toBeVisible();

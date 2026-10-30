@@ -87,7 +87,7 @@ test("Stremio account journey silently tolerates a broken addon and marks exhaus
   await page.getByLabel("Email address").fill("fixture@example.test");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("button", { name: "fixture Profile" }).click();
+  await page.getByRole("button", { name: "fixture" }).click();
   await expect(
     page.getByRole("heading", { name: "Nothing in progress" }),
   ).toBeVisible();

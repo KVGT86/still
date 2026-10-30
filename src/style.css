@@ -3,14 +3,14 @@
   font-style: normal;
   font-weight: 100 1000;
   font-display: swap;
-  src: url("./fonts/DMSans.ttf") format("truetype");
+  src: url("./fonts/DMSans.woff2") format("woff2");
 }
 @font-face {
   font-family: "Manrope";
   font-style: normal;
   font-weight: 200 800;
   font-display: swap;
-  src: url("./fonts/Manrope.ttf") format("truetype");
+  src: url("./fonts/Manrope.woff2") format("woff2");
 }
 :root {
   font-family: "DM Sans", sans-serif;
@@ -257,8 +257,7 @@ nav button,
 .account,
 .segmented,
 .player-options,
-.close-modal,
-.art-play {
+.close-modal {
   background-color: var(--glass);
   background-image: radial-gradient(
     140px circle at var(--glass-x, 25%) var(--glass-y, 0%),
@@ -493,16 +492,24 @@ main {
   border: 0;
   border-radius: 15px;
   overflow: hidden;
-  background-size: cover;
-  background-position: center;
   padding: 0;
   text-align: left;
   color: #fff;
   background-color: #384b3d;
 }
+.art-button img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
 .featured .art-button {
   aspect-ratio: 2.75;
-  background-position: center 44%;
+}
+.featured .art-button img {
+  object-position: center 44%;
 }
 .recent .art-button {
   aspect-ratio: 1.55;
@@ -828,27 +835,106 @@ main {
 }
 .toast {
   position: fixed;
-  bottom: 25px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 28px;
+  bottom: 28px;
   z-index: 200;
   background: var(--text);
   color: var(--bg);
   border-radius: 12px;
-  padding: 12px 14px 12px 22px;
+  padding: 10px 8px 10px 14px;
   box-shadow: var(--shadow);
   display: flex;
   align-items: center;
-  gap: 25px;
-  max-width: 80vw;
-  font-size: 13px;
+  gap: 10px;
+  max-width: min(360px, 80vw);
+  font-size: 12px;
+  line-height: 1.35;
+  animation: toast-in 0.22s ease-out;
+}
+.toast i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e5826f;
 }
 .toast button {
+  flex: none;
   color: inherit;
   border: 0;
   background: transparent;
-  font-size: 22px;
   padding: 5px;
+  opacity: 0.7;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.load-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  background-size: cover;
+  background-position: center;
+  animation: load-in 0.25s ease-out;
+}
+.load-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #101a15d9;
+  backdrop-filter: blur(18px) saturate(110%);
+}
+.load-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  color: #fff;
+  max-width: 70vw;
+}
+.load-card h2 {
+  font-size: clamp(22px, 2.4vw, 36px);
+  margin-top: 14px;
+}
+.load-card p {
+  color: #ffffffb3;
+  font-size: 14px;
+}
+.load-card button {
+  margin-top: 14px;
+  padding: 8px 22px;
+  border: 1px solid #ffffff55;
+  border-radius: 999px;
+  background: #ffffff18;
+  color: #fff;
+}
+.load-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid #ffffff2e;
+  border-top-color: #fff;
+  animation: still-spin 0.9s linear infinite;
+}
+@keyframes load-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .load-ring {
+    animation-duration: 3s;
+  }
+  .toast,
+  .load-screen {
+    animation: none;
+  }
 }
 .modal-backdrop {
   position: fixed;

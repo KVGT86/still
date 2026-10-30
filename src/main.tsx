@@ -1,8 +1,7 @@
 import "./polyfills";
 import appIcon from "./assets/app-icon.svg";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import QRCode from "qrcode";
 import type {
   Addon,
   Episode,
@@ -102,11 +101,16 @@ function ContinueCard({
         className="art-button"
         disabled={disabled}
         onClick={onPlay}
-        style={{
-          backgroundImage: `url("${item.meta.background || item.meta.poster || ""}")`,
-        }}
         aria-label={`Continue ${item.meta.name}`}
       >
+        {(item.meta.background || item.meta.poster) && (
+          <img
+            src={item.meta.background || item.meta.poster}
+            alt=""
+            loading={variant === "featured" ? "eager" : "lazy"}
+            decoding="async"
+          />
+        )}
         <div className="art-shade" />
         <span className="media-label">
           {item.meta.type === "series" ? "SERIES" : "FILM"}
@@ -193,7 +197,9 @@ function App() {
     [error, setError] = useState(""),
     [detail, setDetail] = useState<Meta | null>(null),
     [season, setSeason] = useState(1),
-    [resolving, setResolving] = useState(false);
+    [resolving, setResolving] = useState(false),
+    [loadTitle, setLoadTitle] = useState<Meta | null>(null),
+    [stage, setStage] = useState("");
   const [sources, setSources] = useState<{
       meta: Meta;
       videoId: string;
@@ -332,7 +338,8 @@ function App() {
         !form
       ) {
         e.preventDefault();
-        if (play) setPlay(null);
+        if (resolving) cancelLoad();
+        else if (play) setPlay(null);
         else if (sources) {
           setSources(null);
           requestId.current++;
@@ -406,7 +413,12 @@ function App() {
     };
     window.addEventListener("keydown", remote);
     return () => window.removeEventListener("keydown", remote);
-  }, [page, detail, dialog, play, sources]);
+  }, [page, detail, dialog, play, sources, resolving]);
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(""), 9000);
+    return () => clearTimeout(timer);
+  }, [error]);
   async function signedIn(value: Session) {
     if (service) {
       try {
@@ -505,6 +517,8 @@ function App() {
         : s;
     });
     setResolving(true);
+    setLoadTitle(meta);
+    setStage("Finding sources…");
     setError("");
     const list = demo
       ? [demoSource]
@@ -527,29 +541,34 @@ function App() {
     failed: string[],
     id = requestId.current,
   ) {
-    if (source.infoHash) setResolving(true);
+    if (source.infoHash) {
+      setResolving(true);
+      setStage(
+        failed.length
+          ? `Trying another source (${failed.length + 1})…`
+          : "Connecting to the streaming engine…",
+      );
+    }
     try {
-      const url = await api.resolvePlayUrl(source, streamingServer);
-      const tracks = [...(source.subtitles || [])];
+      // Fetched alongside the stream URL so the player opens once, with subtitles, never restarts for them.
+      const [url, extra] = await Promise.all([
+        api.resolvePlayUrl(source, streamingServer),
+        demo
+          ? []
+          : Promise.race([
+              api.subtitles(addons, meta.type, videoId).catch(() => []),
+              new Promise<never[]>((done) => setTimeout(() => done([]), 2500)),
+            ]),
+      ]);
+      const tracks = [...(source.subtitles || []), ...extra];
       if (id !== requestId.current) return;
       setResolving(false);
       setSources(null);
       setPlay({ meta, videoId, source, url, tracks, auto, all, failed });
-      if (!demo)
-        void api
-          .subtitles(addons, meta.type, videoId)
-          .then((extra) =>
-            setPlay((current) =>
-              current?.url === url &&
-              current.videoId === videoId &&
-              current.source.key === source.key
-                ? { ...current, tracks: [...tracks, ...extra] }
-                : current,
-            ),
-          );
     } catch (e) {
       if (id !== requestId.current) return;
       setResolving(false);
+      setError(`${message(e)} ${auto.length ? "Trying another source…" : ""}`);
       if (auto.length)
         await begin(
           meta,
@@ -570,10 +589,15 @@ function App() {
         });
     }
   }
+  function cancelLoad() {
+    requestId.current++;
+    setResolving(false);
+  }
   function failed(reason: string) {
     if (!play) return;
     const p = play;
     setPlay(null);
+    setError(`${reason} ${p.auto.length ? "Trying another source…" : ""}`);
     if (p.auto.length)
       void begin(p.meta, p.videoId, p.auto[0], p.auto.slice(1), p.all, [
         ...p.failed,
@@ -641,6 +665,10 @@ function App() {
       },
     }));
   }
+  const recommended = useMemo(
+    () => (page === "Recommended" ? recommend(catalog, data) : []),
+    [page, catalog, data.feedback, data.progress],
+  );
   const continuation = continueItems(data) as any[];
   const recentContinuation = continuation.slice(1, 6);
   const earlierContinuation = continuation.slice(6);
@@ -651,7 +679,7 @@ function App() {
           .map((x) => x.meta)
       : page === "Search"
         ? results
-        : recommend(catalog, data);
+        : recommended;
   const resume = detail
     ? Object.values(data.progress)
         .filter((p) => p.meta.id === detail.id && !p.completed && !p.hidden)
@@ -945,11 +973,31 @@ function App() {
           </main>
         </div>
       )}
-      {error && (
+      {resolving && loadTitle && (
+        <div
+          className="load-screen"
+          role="dialog"
+          aria-label="Preparing playback"
+          style={{
+            backgroundImage: `url("${loadTitle.background || loadTitle.poster || ""}")`,
+          }}
+        >
+          <div className="load-card" role="status">
+            <span className="load-ring" aria-hidden="true" />
+            <h2>{loadTitle.name}</h2>
+            <p>{stage}</p>
+            <button autoFocus onClick={cancelLoad}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {error.trim() && (
         <div className="toast" role="alert">
-          <span>{error}</span>
+          <i aria-hidden="true" />
+          <span>{error.trim()}</span>
           <button onClick={() => setError("")} aria-label="Dismiss error">
-            <Icon name="close" />
+            <Icon name="close" size={14} />
           </button>
         </div>
       )}
@@ -957,7 +1005,7 @@ function App() {
         <Modal
           onClose={() => {
             setDetail(null);
-            requestId.current++;
+            cancelLoad();
           }}
           wide
         >
@@ -1501,7 +1549,9 @@ function Login({
         setLink(r.link);
         setCode(r.code);
         setQr(
-          await QRCode.toDataURL(r.link, {
+          await (
+            await import("qrcode")
+          ).default.toDataURL(r.link, {
             margin: 1,
             width: 224,
             color: { dark: "#20251f", light: "#ffffff" },
