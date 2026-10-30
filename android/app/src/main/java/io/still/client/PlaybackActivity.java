@@ -29,6 +29,11 @@ public class PlaybackActivity extends Activity {
     private TextView time;
     private Button pause;
     private ProgressBar spinner;
+    private FrameLayout loader;
+    private ImageView frost;
+    private View glass;
+    private TextView percent;
+    private float progress = 0.5f;
     private final Handler handler = new Handler();
     private int ticks;
     private final Runnable hide = () -> { if (player != null && player.isPlaying()) { top.setVisibility(View.INVISIBLE); bottom.setVisibility(View.INVISIBLE); } };
@@ -57,7 +62,7 @@ public class PlaybackActivity extends Activity {
             player.addListener(new Player.Listener() {
                 @Override public void onPlayerError(PlaybackException exception) { error = "This source could not be played."; finish(); }
                 @Override public void onIsPlayingChanged(boolean playing) { if (playing) reveal(); }
-                @Override public void onPlaybackStateChanged(int state) { spinner.setVisibility(state == Player.STATE_READY || state == Player.STATE_ENDED ? View.GONE : View.VISIBLE); if (state == Player.STATE_READY) ready = true; if (state == Player.STATE_ENDED) { ended = true; finish(); } }
+                @Override public void onPlaybackStateChanged(int state) { spinner.setVisibility(state == Player.STATE_READY || state == Player.STATE_ENDED ? View.GONE : View.VISIBLE); if (state == Player.STATE_READY) { ready = true; finishLoader(); } if (state == Player.STATE_ENDED) { ended = true; finish(); } }
             });
             List<MediaItem.SubtitleConfiguration> subtitles = new ArrayList<>(); JSONArray tracks = payload.optJSONArray("tracks");
             if (tracks != null) for (int i = 0; i < tracks.length(); i++) {
@@ -83,7 +88,7 @@ public class PlaybackActivity extends Activity {
         pause = button("Ⅱ", () -> { if (player.isPlaying()) player.pause(); else player.play(); }); pause.setContentDescription("Play or pause"); transport.addView(pause);
         transport.addView(button("Audio & subtitles", () -> new AlertDialog.Builder(this).setItems(new String[]{"Audio language", "Subtitles"}, (d, which) -> chooseTrack(which == 0 ? C.TRACK_TYPE_AUDIO : C.TRACK_TYPE_TEXT)).show()));
         if (payload.optBoolean("hasNext")) transport.addView(button("Next episode →", () -> { explicitNext = true; finish(); }));
-        bottom.addView(transport); root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM)); root.setOnClickListener(v -> reveal()); setContentView(root); pause.requestFocus(); reveal();
+        bottom.addView(transport); root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM)); buildLoader(root, payload); root.setOnClickListener(v -> reveal()); setContentView(root); pause.requestFocus(); reveal();
     }
     private LinearLayout row() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.HORIZONTAL); view.setGravity(Gravity.CENTER_VERTICAL); return view; }
     private Button button(String label, Runnable action) {
@@ -97,6 +102,38 @@ public class PlaybackActivity extends Activity {
         List<String> labels = new ArrayList<>(); List<TrackSelectionOverride> overrides = new ArrayList<>(); labels.add(type == C.TRACK_TYPE_TEXT ? "Off" : "Automatic"); overrides.add(null);
         for (Tracks.Group group : player.getCurrentTracks().getGroups()) if (group.getType() == type) for (int i = 0; i < group.length; i++) if (group.isTrackSupported(i)) { Format format = group.getTrackFormat(i); labels.add(format.label != null ? format.label : format.language != null ? format.language : "Track " + (i + 1)); overrides.add(new TrackSelectionOverride(group.getMediaTrackGroup(), i)); }
         new AlertDialog.Builder(this).setTitle(type == C.TRACK_TYPE_TEXT ? "Subtitles" : "Audio language").setItems(labels.toArray(new String[0]), (dialog, index) -> { TrackSelectionParameters.Builder parameters = player.getTrackSelectionParameters().buildUpon().clearOverridesOfType(type).setTrackTypeDisabled(type, type == C.TRACK_TYPE_TEXT && index == 0); if (overrides.get(index) != null) parameters.addOverride(overrides.get(index)); player.setTrackSelectionParameters(parameters.build()); }).show();
+    }
+    // Artwork starts frosted (a tiny copy scaled up) and sharpens as progress climbs; the web UI hands over at 50%.
+    private void buildLoader(FrameLayout root, JSONObject payload) {
+        loader = new FrameLayout(this); loader.setBackgroundColor(0xFF101A15);
+        ImageView art = new ImageView(this); frost = new ImageView(this);
+        for (ImageView view : new ImageView[] { art, frost }) { view.setScaleType(ImageView.ScaleType.CENTER_CROP); loader.addView(view, new FrameLayout.LayoutParams(-1, -1)); }
+        glass = new View(this); glass.setBackgroundColor(0xFF101A15); loader.addView(glass, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setGravity(Gravity.CENTER_HORIZONTAL);
+        percent = new TextView(this); percent.setTextColor(Color.WHITE); percent.setTextSize(44); percent.setGravity(Gravity.CENTER);
+        TextView name = new TextView(this); name.setText(payload.optString("title")); name.setTextColor(Color.WHITE); name.setTextSize(26); name.setGravity(Gravity.CENTER); name.setPadding(0, 16, 0, 6);
+        TextView label = new TextView(this); label.setText(payload.optBoolean("torrent") ? "FINDING PEERS" : "CONNECTING"); label.setTextColor(0xCCFFFFFF); label.setTextSize(13); label.setLetterSpacing(0.2f);
+        box.addView(percent); box.addView(name); box.addView(label);
+        loader.addView(box, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER)); root.addView(loader, new FrameLayout.LayoutParams(-1, -1));
+        paintLoader();
+        String url = payload.optString("art");
+        if (url.startsWith("http")) new Thread(() -> {
+            try {
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(url).openConnection(); connection.setConnectTimeout(8000); connection.setReadTimeout(8000);
+                android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options(); options.inSampleSize = 2;
+                android.graphics.Bitmap sharp = android.graphics.BitmapFactory.decodeStream(connection.getInputStream(), null, options);
+                if (sharp == null) return;
+                android.graphics.Bitmap small = android.graphics.Bitmap.createScaledBitmap(sharp, Math.max(1, sharp.getWidth() / 32), Math.max(1, sharp.getHeight() / 32), true);
+                runOnUiThread(() -> { if (!finished) { art.setImageBitmap(sharp); frost.setImageBitmap(small); paintLoader(); } });
+            } catch (Exception ignored) { /* The loader still works without artwork. */ }
+        }).start();
+        handler.postDelayed(new Runnable() { public void run() { if (loader.getVisibility() != View.VISIBLE || ready) return; progress += (0.92f - progress) * 0.04f; paintLoader(); handler.postDelayed(this, 250); } }, 250);
+    }
+    private void paintLoader() { percent.setText(Math.round(progress * 100) + "%"); frost.setAlpha(1 - progress); glass.setAlpha((1 - progress) * 0.6f); }
+    private void finishLoader() {
+        if (loader == null || loader.getVisibility() != View.VISIBLE) return;
+        progress = 1f; paintLoader();
+        loader.animate().alpha(0f).setStartDelay(350).setDuration(500).withEndAction(() -> loader.setVisibility(View.GONE)).start();
     }
     private String stamp(double seconds) { return String.format(Locale.ROOT, "%d:%02d", (int) seconds / 60, (int) seconds % 60); }
     @Override protected void onPause() { super.onPause(); if (player != null) player.pause(); }
