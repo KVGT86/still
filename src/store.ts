@@ -41,7 +41,21 @@ export function useProfileStore(
     let alive = true;
     loaded.current = false;
     dirty.current = readLocal(key + ":dirty", false);
-    const cached = readLocal<ProfileState>(key, blankState());
+    const legacyTheme = readLocal<"light" | "dark">("still.theme", "light");
+    const stored = readLocal<ProfileState | null>(key, null);
+    const cached = {
+      ...blankState(),
+      ...stored,
+      settings: {
+        ...blankState().settings,
+        ...stored?.settings,
+        theme: stored?.settings?.theme || legacyTheme,
+      },
+    } as ProfileState;
+    if (service && stored && !stored.settings?.theme) {
+      dirty.current = true;
+      localStorage.setItem(key + ":dirty", "true");
+    }
     install(cached);
     const pull = async () => {
       try {

@@ -53,7 +53,7 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 - Profile preferences for audio, optional subtitles and autoplay: on, off, or 07:00–22:00 device local time.
 - Continue Watching begins at 2%; completion at 95% queues the next released unwatched episode. Manual removal does not mark watched.
 - One Saved collection and feedback-driven catalog ranking: More Like This, Not Interested, Already Watched. This is a deterministic genre-affinity recommendation model and requires no paid AI service.
-- Light and neutral dark themes, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
+- Per-profile light and neutral dark themes, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
 - Android's built-in Media3 player; browser/webOS HTML video with HLS fallback.
 
 ## What Still cannot do
@@ -69,7 +69,7 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 
 ## Interface gallery
 
-Every screenshot uses labelled fixture data. Light is the default theme; dark is available per device.
+Every screenshot uses labelled fixture data. Light is the default theme; each profile remembers its own theme.
 
 | Page          | Light                                                            | Dark                                                           |
 | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
@@ -106,7 +106,7 @@ Use this when one person uses the Stremio account.
 4. Leave **Settings > Household profiles** disconnected.
 5. On Linux, leave **Stremio streaming server** blank to use the local engine. On Android, browser or webOS, enter a reachable Stremio engine URL for torrent sources.
 
-Saved titles and playback state use Stremio's library. Stremio's watched-episode bitfield is preserved when a series is updated. Audio, subtitle, autoplay and recommendation-feedback settings remain local to each device. No companion database is required.
+Saved titles and playback state use Stremio's library. Stremio's watched-episode bitfield is preserved when a series is updated. Theme, audio, subtitle, autoplay and recommendation-feedback settings remain local to the profile on that device. No companion database is required.
 
 ### Path B: synchronized household profiles
 
@@ -161,14 +161,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.1.2-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.1.3-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.1.2-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.1.3-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -219,7 +219,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.1.2_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.1.3_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 

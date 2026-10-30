@@ -293,6 +293,8 @@ function validState(state) {
     /^[a-z]{2,3}$/.test(state.settings.audio) &&
     typeof state.settings.subtitle === "string" &&
     /^[a-z]{2,3}$/.test(state.settings.subtitle) &&
+    (state.settings.theme === undefined ||
+      ["light", "dark"].includes(state.settings.theme)) &&
     typeof state.settings.subtitles === "boolean" &&
     ["on", "off", "scheduled"].includes(state.settings.autoplay) &&
     Number.isFinite(state.settingsAt) &&

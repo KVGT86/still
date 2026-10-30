@@ -154,6 +154,7 @@ test("Continue Watching tiers the latest item, next five and earlier items", asy
         ),
         feedback: {},
         settings: {
+          theme: "light",
           audio: "en",
           subtitle: "en",
           subtitles: true,

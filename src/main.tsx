@@ -168,7 +168,6 @@ function App() {
       readLocal("still.serviceToken", ""),
     );
   const [page, setPage] = useState("Home"),
-    [theme, setTheme] = useState(readLocal("still.theme", "light")),
     [quality, setQuality] = useState(
       readLocal("still.quality", detectedQuality()),
     ),
@@ -231,9 +230,8 @@ function App() {
     return () => window.removeEventListener("pointermove", highlight);
   }, []);
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("still.theme", JSON.stringify(theme));
-  }, [theme]);
+    document.documentElement.dataset.theme = data.settings.theme;
+  }, [data.settings.theme]);
   useEffect(() => {
     const expired = () => {
       setSession(null);
@@ -770,8 +768,6 @@ function App() {
                 {...{
                   data,
                   change,
-                  theme,
-                  setTheme,
                   quality,
                   setQuality,
                   streamingServer,
@@ -1655,8 +1651,8 @@ function Settings(p: any) {
             {["light", "dark"].map((t) => (
               <button
                 key={t}
-                aria-pressed={p.theme === t}
-                onClick={() => p.setTheme(t)}
+                aria-pressed={data.settings.theme === t}
+                onClick={() => set("theme", t)}
               >
                 <Icon name={t === "light" ? "sun" : "moon"} size={16} />
                 {t === "light" ? "Light" : "Dark"}
@@ -1796,7 +1792,7 @@ function Settings(p: any) {
         )}
       </section>
       <p className="fine-print">
-        Still 0.1.2 · An independent Stremio client.
+        Still 0.1.3 · An independent Stremio client.
         <br />
         Configured addons supply catalogs and sources. No content is hosted by
         Still.

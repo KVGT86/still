@@ -1,4 +1,5 @@
 export const defaults = {
+  theme: "light",
   audio: "en",
   subtitle: "en",
   subtitles: true,
@@ -171,7 +172,11 @@ export function rankSources(streams, audio, maxQuality) {
     );
 }
 export function mergeState(current, incoming) {
-  const next = { ...blankState(), ...current };
+  const next = {
+    ...blankState(),
+    ...current,
+    settings: { ...defaults, ...current.settings },
+  };
   for (const field of ["saved", "progress", "feedback"]) {
     next[field] = { ...next[field] };
     for (const [key, item] of Object.entries(incoming[field] || {}))
@@ -182,7 +187,7 @@ export function mergeState(current, incoming) {
         next[field][key] = item;
   }
   if (Number(incoming.settingsAt) > Number(next.settingsAt)) {
-    next.settings = { ...defaults, ...incoming.settings };
+    next.settings = { ...defaults, ...next.settings, ...incoming.settings };
     next.settingsAt = incoming.settingsAt;
   }
   return next;

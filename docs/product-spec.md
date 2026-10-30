@@ -145,7 +145,7 @@ Individual addon failures are silent when other addons return usable results. If
 - Light is the default theme.
 - A neutral dark theme is also available.
 - Purple is not part of the product identity.
-- The selected theme persists. Whether persistence is per profile or per device is an implementation choice.
+- The selected theme persists per profile. Household profiles synchronize it through the profile service; the single profile keeps it on each device.
 
 ## Acceptance scenarios
 
@@ -173,7 +173,5 @@ Two profiles use the same Stremio account and addon configuration. Their Saved c
 
 - Project name and branding assets.
 - The recommendation model or ranking algorithm.
-- Whether theme persistence is per device or per profile.
 - The framework and packaging strategy used to share code across webOS and Android packages.
 - The exact mapping of addon-specific availability metadata into a common ranking signal.
-

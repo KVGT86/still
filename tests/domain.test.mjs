@@ -77,6 +77,22 @@ test("merge preserves independent devices and newest tombstones", () => {
   assert.equal(merged.saved.a.deleted, true);
   assert.equal(mergeState(merged, a).saved.a.deleted, true);
 });
+test("theme defaults to light and follows the newest profile settings", () => {
+  const oldState = blankState();
+  delete oldState.settings.theme;
+  const migrated = mergeState(oldState, blankState());
+  assert.equal(migrated.settings.theme, "light");
+
+  const dark = blankState();
+  dark.settings.theme = "dark";
+  dark.settingsAt = 2;
+  assert.equal(mergeState(migrated, dark).settings.theme, "dark");
+
+  const legacyRemote = blankState();
+  delete legacyRemote.settings.theme;
+  legacyRemote.settingsAt = 3;
+  assert.equal(mergeState(dark, legacyRemote).settings.theme, "dark");
+});
 test("recommendations exclude feedback and rank similar genres", () => {
   const state = blankState();
   state.feedback.a = { meta, value: "more", updatedAt: 1 };

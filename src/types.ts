@@ -53,6 +53,7 @@ export type ProfileState = {
   progress: Record<string, Progress>;
   feedback: Record<string, { meta: Meta; value: string; updatedAt: number }>;
   settings: {
+    theme: string;
     audio: string;
     subtitle: string;
     subtitles: boolean;
