@@ -1,5 +1,6 @@
 import express from "express";
 import { DatabaseSync, backup } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import {
   randomBytes,
   createHash,
@@ -7,6 +8,9 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { blankState, mergeState } from "../shared/domain.mjs";
+const version = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const opaque = () => randomBytes(32).toString("hex");
 const pinHash = (pin, salt) => scryptSync(pin, salt, 32).toString("hex");
@@ -63,7 +67,7 @@ export function createApp({
       return res.status(400).json({ error: "A JSON object is required." });
     next();
   });
-  app.get("/api/health", (_, res) => res.json({ ok: true, version: "0.1.0" }));
+  app.get("/api/health", (_, res) => res.json({ ok: true, version }));
   function limited(key, max) {
     const now = Date.now();
     let bucket = limits.get(key);
