@@ -161,14 +161,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.2.1-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.2.2-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.2.1-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.2.2-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -219,7 +219,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.2.1_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.2.2_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 
