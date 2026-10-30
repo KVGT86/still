@@ -380,6 +380,12 @@ function App() {
         y = r.top + r.height / 2;
       const candidates = els
         .filter((x) => x !== el)
+        // Remove buttons are only reachable from their own card, or they outrank the artwork.
+        .filter(
+          (x) =>
+            !x.classList.contains("remove") ||
+            x.closest(".continue-card") === el?.closest(".continue-card"),
+        )
         .map((item) => {
           const b = item.getBoundingClientRect();
           const xx = b.left + b.width / 2 - x,
@@ -678,7 +684,7 @@ function App() {
                       <Avatar value={p.avatar} size={52} />
                     </span>
                     <strong>{p.name}</strong>
-                    <small>{p.locked ? "PIN protected" : "Profile"}</small>
+                    {p.locked && <small>PIN protected</small>}
                   </button>
                 </div>
               ))}
@@ -763,177 +769,179 @@ function App() {
                   : "STILL / " + (service ? "HOUSEHOLD" : "PERSONAL")}
               </div>
             </header>
-            {page === "Settings" ? (
-              <Settings
-                {...{
-                  data,
-                  change,
-                  quality,
-                  setQuality,
-                  streamingServer,
-                  setStreamingServer,
-                  service,
-                  demo,
-                }}
-                onService={() => setDialog("service")}
-                onProfile={() => {
-                  setTarget(active);
-                  setDialog("edit");
-                }}
-              />
-            ) : (
-              <>
-                <div className="page-heading">
-                  <div>
-                    <h1>
-                      {page === "Home"
-                        ? "Continue watching"
-                        : page === "Recommended"
-                          ? "Recommended"
-                          : page === "Saved"
-                            ? "Saved"
-                            : "Search"}
-                    </h1>
-                  </div>
-                  {page === "Home" && (
-                    <span className="item-count">
-                      {continuation.length} in progress
-                    </span>
-                  )}
-                </div>
-                {page === "Search" && (
-                  <div className="search-box">
-                    <Icon name="search" size={22} />
-                    <input
-                      aria-label="Search movies and series"
-                      placeholder="Search movies and series"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                    {search && (
-                      <button
-                        aria-label="Clear search"
-                        onClick={() => setSearch("")}
-                      >
-                        <Icon name="close" />
-                      </button>
+            <div className="main-scroll">
+              {page === "Settings" ? (
+                <Settings
+                  {...{
+                    data,
+                    change,
+                    quality,
+                    setQuality,
+                    streamingServer,
+                    setStreamingServer,
+                    service,
+                    demo,
+                  }}
+                  onService={() => setDialog("service")}
+                  onProfile={() => {
+                    setTarget(active);
+                    setDialog("edit");
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="page-heading">
+                    <div>
+                      <h1>
+                        {page === "Home"
+                          ? "Continue watching"
+                          : page === "Recommended"
+                            ? "Recommended"
+                            : page === "Saved"
+                              ? "Saved"
+                              : "Search"}
+                      </h1>
+                    </div>
+                    {page === "Home" && (
+                      <span className="item-count">
+                        {continuation.length} in progress
+                      </span>
                     )}
                   </div>
-                )}
-                {page === "Home" ? (
-                  continuation.length ? (
-                    <>
-                      <ContinueCard
-                        item={continuation[0]}
-                        variant="featured"
-                        disabled={resolving}
-                        onPlay={() =>
-                          void launch(
-                            continuation[0].meta,
-                            continuation[0].videoId,
-                          )
-                        }
-                        onRemove={() => hide(continuation[0].videoId)}
+                  {page === "Search" && (
+                    <div className="search-box">
+                      <Icon name="search" size={22} />
+                      <input
+                        aria-label="Search movies and series"
+                        placeholder="Search movies and series"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
                       />
-                      {!!recentContinuation.length && (
-                        <section className="continue-tier">
-                          <h2>Recently watched</h2>
-                          <div className="continue-row">
-                            {recentContinuation.map((p) => (
-                              <ContinueCard
-                                item={p}
-                                variant="recent"
-                                disabled={resolving}
-                                key={p.videoId}
-                                onPlay={() => void launch(p.meta, p.videoId)}
-                                onRemove={() => hide(p.videoId)}
-                              />
-                            ))}
-                          </div>
-                        </section>
+                      {search && (
+                        <button
+                          aria-label="Clear search"
+                          onClick={() => setSearch("")}
+                        >
+                          <Icon name="close" />
+                        </button>
                       )}
-                      {!!earlierContinuation.length && (
-                        <section className="continue-tier">
-                          <h2>Earlier</h2>
-                          <div className="continue-grid">
-                            {earlierContinuation.map((p) => (
-                              <ContinueCard
-                                item={p}
-                                disabled={resolving}
-                                key={p.videoId}
-                                onPlay={() => void launch(p.meta, p.videoId)}
-                                onRemove={() => hide(p.videoId)}
-                              />
-                            ))}
-                          </div>
-                        </section>
-                      )}
-                    </>
-                  ) : (
-                    <Empty
-                      icon="play"
-                      title="Nothing in progress"
-                      text="Movies and episodes appear here after 2% watched."
-                      action="Explore Recommended"
-                      onAction={() => setPage("Recommended")}
-                    />
-                  )
-                ) : (
-                  <>
-                    {loading ? (
-                      <div className="loading" role="status">
-                        <Icon name="loading" className="spin" />
-                        Loading titles…
-                      </div>
-                    ) : titles.length ? (
-                      <div className="poster-grid">
-                        {titles.map((m: Meta) => (
-                          <button
-                            className="poster-card"
-                            key={m.id}
-                            onClick={() => void open(m)}
-                          >
-                            {m.poster ? (
-                              <img src={m.poster} alt="" loading="lazy" />
-                            ) : (
-                              <div className="poster-fallback">{m.name}</div>
-                            )}
-                            <strong>{m.name}</strong>
-                            <small>
-                              {m.releaseInfo || m.type}{" "}
-                              {m.imdbRating ? " · " + m.imdbRating : ""}
-                            </small>
-                          </button>
-                        ))}
-                      </div>
+                    </div>
+                  )}
+                  {page === "Home" ? (
+                    continuation.length ? (
+                      <>
+                        <ContinueCard
+                          item={continuation[0]}
+                          variant="featured"
+                          disabled={resolving}
+                          onPlay={() =>
+                            void launch(
+                              continuation[0].meta,
+                              continuation[0].videoId,
+                            )
+                          }
+                          onRemove={() => hide(continuation[0].videoId)}
+                        />
+                        {!!recentContinuation.length && (
+                          <section className="continue-tier">
+                            <h2>Recently watched</h2>
+                            <div className="continue-row">
+                              {recentContinuation.map((p) => (
+                                <ContinueCard
+                                  item={p}
+                                  variant="recent"
+                                  disabled={resolving}
+                                  key={p.videoId}
+                                  onPlay={() => void launch(p.meta, p.videoId)}
+                                  onRemove={() => hide(p.videoId)}
+                                />
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                        {!!earlierContinuation.length && (
+                          <section className="continue-tier">
+                            <h2>Earlier</h2>
+                            <div className="continue-grid">
+                              {earlierContinuation.map((p) => (
+                                <ContinueCard
+                                  item={p}
+                                  disabled={resolving}
+                                  key={p.videoId}
+                                  onPlay={() => void launch(p.meta, p.videoId)}
+                                  onRemove={() => hide(p.videoId)}
+                                />
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                      </>
                     ) : (
                       <Empty
-                        icon={page === "Saved" ? "saved" : "search"}
-                        title={
-                          page === "Saved"
-                            ? "No saved titles"
-                            : page === "Search" && !search
-                              ? "Search movies and series"
-                              : "No titles found"
-                        }
-                        text={
-                          page === "Saved"
-                            ? "Save a movie or series from its details to keep it here."
-                            : page === "Search"
-                              ? "Search the catalogs from your configured addons."
-                              : "No results available from your configured addons."
-                        }
+                        icon="play"
+                        title="Nothing in progress"
+                        text="Movies and episodes appear here after 2% watched."
+                        action="Explore Recommended"
+                        onAction={() => setPage("Recommended")}
                       />
-                    )}
-                  </>
-                )}
-              </>
-            )}
-            {syncStatus && (
-              <p className="sync-notice" role="status">
-                {syncStatus}
-              </p>
-            )}
+                    )
+                  ) : (
+                    <>
+                      {loading ? (
+                        <div className="loading" role="status">
+                          <Icon name="loading" className="spin" />
+                          Loading titles…
+                        </div>
+                      ) : titles.length ? (
+                        <div className="poster-grid">
+                          {titles.map((m: Meta) => (
+                            <button
+                              className="poster-card"
+                              key={m.id}
+                              onClick={() => void open(m)}
+                            >
+                              {m.poster ? (
+                                <img src={m.poster} alt="" loading="lazy" />
+                              ) : (
+                                <div className="poster-fallback">{m.name}</div>
+                              )}
+                              <strong>{m.name}</strong>
+                              <small>
+                                {m.releaseInfo || m.type}{" "}
+                                {m.imdbRating ? " · " + m.imdbRating : ""}
+                              </small>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <Empty
+                          icon={page === "Saved" ? "saved" : "search"}
+                          title={
+                            page === "Saved"
+                              ? "No saved titles"
+                              : page === "Search" && !search
+                                ? "Search movies and series"
+                                : "No titles found"
+                          }
+                          text={
+                            page === "Saved"
+                              ? "Save a movie or series from its details to keep it here."
+                              : page === "Search"
+                                ? "Search the catalogs from your configured addons."
+                                : "No results available from your configured addons."
+                          }
+                        />
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+              {syncStatus && (
+                <p className="sync-notice" role="status">
+                  {syncStatus}
+                </p>
+              )}
+            </div>
           </main>
         </div>
       )}
