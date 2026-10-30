@@ -19,7 +19,6 @@ public class MainActivity extends Activity {
   web.addJavascriptInterface(new Bridge(),"StillNative");web.loadUrl("https://appassets.androidplatform.net/assets/public/index.html");
  }
  private class Bridge {
-  @JavascriptInterface public void setSubtitles(String payload){runOnUiThread(()->{if(PlaybackActivity.current!=null)PlaybackActivity.current.addSubtitles(payload);});}
   @JavascriptInterface public void play(String payload){runOnUiThread(()->{Intent intent=new Intent(MainActivity.this,PlaybackActivity.class);intent.putExtra("payload",payload);startActivityForResult(intent,10);});}
   @JavascriptInterface public int maxQuality(){android.view.Display.Mode mode=getWindowManager().getDefaultDisplay().getMode();int width=Math.max(mode.getPhysicalWidth(),mode.getPhysicalHeight());return width>=3840?2160:width>=1920?1080:720;}
  }

@@ -28,6 +28,7 @@ public class PlaybackActivity extends Activity {
     private SeekBar timeline;
     private TextView time;
     private Button pause;
+    private ProgressBar spinner;
     private final Handler handler = new Handler();
     private int ticks;
     private final Runnable hide = () -> { if (player != null && player.isPlaying()) { top.setVisibility(View.INVISIBLE); bottom.setVisibility(View.INVISIBLE); } };
@@ -49,13 +50,14 @@ public class PlaybackActivity extends Activity {
             JSONObject payload = new JSONObject(getIntent().getStringExtra("payload"));
             Map<String, String> requestHeaders = new HashMap<>(); JSONObject headers = payload.optJSONObject("headers");
             if (headers != null) for (Iterator<String> keys = headers.keys(); keys.hasNext();) { String key = keys.next(); requestHeaders.put(key, headers.getString(key)); }
-            DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory().setDefaultRequestProperties(requestHeaders).setAllowCrossProtocolRedirects(true);
+            DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory().setDefaultRequestProperties(requestHeaders).setAllowCrossProtocolRedirects(true).setConnectTimeoutMs(60000).setReadTimeoutMs(60000); // the engine holds a request open while it finds torrent peers
             player = new ExoPlayer.Builder(this).setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http))).build();
             player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setPreferredAudioLanguage(payload.optString("audio", "en")).setPreferredTextLanguage(payload.optString("subtitle", "en")).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !payload.optBoolean("subtitles", true)).build());
             buildControls(payload);
             player.addListener(new Player.Listener() {
                 @Override public void onPlayerError(PlaybackException exception) { error = "This source could not be played."; finish(); }
-                @Override public void onPlaybackStateChanged(int state) { if (state == Player.STATE_READY) ready = true; if (state == Player.STATE_ENDED) { ended = true; finish(); } }
+                @Override public void onIsPlayingChanged(boolean playing) { if (playing) reveal(); }
+                @Override public void onPlaybackStateChanged(int state) { spinner.setVisibility(state == Player.STATE_READY || state == Player.STATE_ENDED ? View.GONE : View.VISIBLE); if (state == Player.STATE_READY) ready = true; if (state == Player.STATE_ENDED) { ended = true; finish(); } }
             });
             List<MediaItem.SubtitleConfiguration> subtitles = new ArrayList<>(); JSONArray tracks = payload.optJSONArray("tracks");
             if (tracks != null) for (int i = 0; i < tracks.length(); i++) {
@@ -65,12 +67,12 @@ public class PlaybackActivity extends Activity {
             }
             player.setMediaItem(new MediaItem.Builder().setUri(payload.getString("url")).setSubtitleConfigurations(subtitles).build());
             player.seekTo((long) (payload.optDouble("position", 0) * 1000)); player.prepare(); player.play(); handler.post(report);
-            handler.postDelayed(() -> { if (!ready && !finished) { error = "This source did not start within 30 seconds."; finish(); } }, 30000);
+            handler.postDelayed(() -> { if (!ready && !finished) { error = "This source did not start in time."; finish(); } }, payload.optBoolean("torrent") ? 120000 : 30000);
         } catch (Exception exception) { error = "Invalid playback source."; finish(); }
     }
     private void buildControls(JSONObject payload) {
         FrameLayout root = new FrameLayout(this); root.setBackgroundColor(Color.BLACK);
-        PlayerView video = new PlayerView(this); video.setPlayer(player); video.setUseController(false); root.addView(video, new FrameLayout.LayoutParams(-1, -1));
+        PlayerView video = new PlayerView(this); video.setPlayer(player); video.setUseController(false); root.addView(video, new FrameLayout.LayoutParams(-1, -1)); spinner = new ProgressBar(this); root.addView(spinner, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         top = row(); top.setPadding(24, 8, 24, 8); top.setBackgroundColor(0x99000000); top.addView(button("← Back", () -> finish()));
         TextView title = new TextView(this); title.setText(payload.optString("title")); title.setTextColor(Color.WHITE); title.setTextSize(18); title.setGravity(Gravity.CENTER);
         top.addView(title, new LinearLayout.LayoutParams(0, -2, 1)); top.addView(button("•••", () -> options())); root.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
@@ -95,10 +97,6 @@ public class PlaybackActivity extends Activity {
         List<String> labels = new ArrayList<>(); List<TrackSelectionOverride> overrides = new ArrayList<>(); labels.add(type == C.TRACK_TYPE_TEXT ? "Off" : "Automatic"); overrides.add(null);
         for (Tracks.Group group : player.getCurrentTracks().getGroups()) if (group.getType() == type) for (int i = 0; i < group.length; i++) if (group.isTrackSupported(i)) { Format format = group.getTrackFormat(i); labels.add(format.label != null ? format.label : format.language != null ? format.language : "Track " + (i + 1)); overrides.add(new TrackSelectionOverride(group.getMediaTrackGroup(), i)); }
         new AlertDialog.Builder(this).setTitle(type == C.TRACK_TYPE_TEXT ? "Subtitles" : "Audio language").setItems(labels.toArray(new String[0]), (dialog, index) -> { TrackSelectionParameters.Builder parameters = player.getTrackSelectionParameters().buildUpon().clearOverridesOfType(type).setTrackTypeDisabled(type, type == C.TRACK_TYPE_TEXT && index == 0); if (overrides.get(index) != null) parameters.addOverride(overrides.get(index)); player.setTrackSelectionParameters(parameters.build()); }).show();
-    }
-    void addSubtitles(String payload) {
-        if(player==null||player.getCurrentMediaItem()==null||finished)return;
-        try{JSONArray tracks=new JSONArray(payload);List<MediaItem.SubtitleConfiguration> subtitles=new ArrayList<>();for(int i=0;i<tracks.length();i++){JSONObject track=tracks.getJSONObject(i);String url=track.optString("url");if(!url.startsWith("http"))continue;String mime=url.matches(".*\\.srt(?:\\?.*)?$")?MimeTypes.APPLICATION_SUBRIP:MimeTypes.TEXT_VTT;subtitles.add(new MediaItem.SubtitleConfiguration.Builder(Uri.parse(url)).setMimeType(mime).setLanguage(track.optString("lang")).build());}if(subtitles.isEmpty())return;boolean playing=player.getPlayWhenReady();long position=player.getCurrentPosition();player.setMediaItem(player.getCurrentMediaItem().buildUpon().setSubtitleConfigurations(subtitles).build(),position);player.prepare();player.setPlayWhenReady(playing);}catch(Exception ignored){ /* Optional subtitles never stop playback. */ }
     }
     private String stamp(double seconds) { return String.format(Locale.ROOT, "%d:%02d", (int) seconds / 60, (int) seconds % 60); }
     @Override protected void onPause() { super.onPause(); if (player != null) player.pause(); }
