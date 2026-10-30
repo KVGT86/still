@@ -1,5 +1,5 @@
 import express from "express";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, backup } from "node:sqlite";
 import {
   randomBytes,
   createHash,
@@ -32,6 +32,9 @@ export function createApp({
   },
 } = {}) {
   const db = new DatabaseSync(database);
+  db.exec(
+    "PRAGMA synchronous=FULL; PRAGMA max_page_count=65536; PRAGMA journal_size_limit=67108864;",
+  );
   db.exec(
     "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS profiles (id TEXT PRIMARY KEY, account TEXT NOT NULL, name TEXT NOT NULL, avatar TEXT NOT NULL, pin TEXT, salt TEXT, state TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, account TEXT NOT NULL, expires INTEGER NOT NULL);",
   );
@@ -234,7 +237,7 @@ export function createApp({
           : "Request could not be completed.",
     });
   });
-  return { app, close: () => db.close() };
+  return { app, close: () => db.close(), backup: (file) => backup(db, file) };
 }
 function validState(state) {
   if (!state || typeof state !== "object" || Array.isArray(state)) return false;
