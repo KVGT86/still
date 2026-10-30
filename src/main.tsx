@@ -435,10 +435,12 @@ function App() {
     failed: string[],
     id = requestId.current,
   ) {
+    if (source.infoHash) setResolving(true);
     try {
-      const url = api.playUrl(source, streamingServer);
+      const url = await api.resolvePlayUrl(source, streamingServer);
       const tracks = [...(source.subtitles || [])];
       if (id !== requestId.current) return;
+      setResolving(false);
       setSources(null);
       setPlay({ meta, videoId, source, url, tracks, auto, all, failed });
       if (!demo)
@@ -454,6 +456,8 @@ function App() {
             ),
           );
     } catch (e) {
+      if (id !== requestId.current) return;
+      setResolving(false);
       if (auto.length)
         await begin(
           meta,
@@ -932,7 +936,7 @@ function App() {
                 }
               >
                 <Icon name={resolving ? "loading" : "play"} />
-                {resolving ? "Finding a source…" : resume ? "Resume" : "Play"}
+                {resolving ? "Preparing playback…" : resume ? "Resume" : "Play"}
               </button>
               <button onClick={() => save(detail)}>
                 <Icon
@@ -1688,7 +1692,11 @@ function Settings(p: any) {
         </Setting>
         <Setting
           label="Stremio streaming server"
-          text="Needed for torrent-only sources. Direct HTTP streams work without it."
+          text={
+            window.StillDesktop
+              ? "Leave blank for the local engine. Installs on first torrent."
+              : "Needed for torrent-only sources. Use a reachable Stremio engine."
+          }
         >
           <input
             aria-label="Streaming server address"

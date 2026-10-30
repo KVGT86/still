@@ -16,7 +16,9 @@ The live public QR endpoint was checked from the packaged Linux app and returned
 
 Start with an authorized direct HTTP/HLS source if your configured addons provide one. This requires no Still companion service and no torrent engine.
 
-Torrent-only sources return an `infoHash` instead of a direct video URL. They require a separately running Stremio streaming server. If the official Stremio desktop app is available on this laptop, run it and keep its streaming service running, then set **Settings → Stremio streaming server** to:
+The Linux desktop app now manages its own torrent engine. Leave **Settings → Stremio streaming server** blank, sign in, and choose an authorized torrent source. First use downloads the official engine; subsequent launches reuse it. Allow up to two minutes for a torrent to find peers and prepare playback after installation. An unavailable source still falls back to the next matching source.
+
+On browser, Android and webOS clients, torrent-only sources return an `infoHash` and need a reachable Stremio streaming server. To use an existing official Stremio desktop service on the same device, set **Settings → Stremio streaming server** to:
 
 ```text
 http://127.0.0.1:11470
@@ -24,7 +26,7 @@ http://127.0.0.1:11470
 
 You can instead use the reachable address of an existing streaming server. The server address is distinct from the optional Still profile-sync service. Prefer HTTPS for remote services when using the browser client. The Linux desktop shell keeps Chromium's web security enabled.
 
-No local Stremio streaming server was responding on port 11470 during development of this update.
+Still's managed Linux engine uses its own random loopback port and does not modify another Stremio installation. The profile-service URL is unrelated to this engine.
 
 ## Verify account synchronization
 
@@ -52,6 +54,11 @@ For a reproducible report, include the device, app version, movie/episode ID, se
 npm run check
 npm run test:e2e
 npm run test:desktop
+npm run engine:prepare
+npm run test:torrent
+npm run test:desktop:torrent
 ```
 
 The account browser test uses fixtures to verify sign-in, addon reads, silent addon failure, source ranking, exhausted-source fallback and Saved behavior. It does not log into your account. The desktop smoke test verifies the app window, isolated renderer, preview, navigation and theme switching.
+
+Torrent tests require system FFmpeg to generate an original test video. They run a real loopback BitTorrent seed and HTTP tracker, exchange torrent metadata and video pieces, verify automatic file selection and byte-range seeks, and exercise HLS conversion. The desktop torrent test signs into a fixture account and plays an MKV with AC3 audio through the actual player, checking decoded audio and seeking. It can target an installed bundle with `STILL_PACKAGED_BINARY=artifacts/linux/linux-unpacked/still npm run test:desktop:torrent`. No public swarm or private account is needed for these checks.

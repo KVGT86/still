@@ -35,7 +35,10 @@ try {
   assert.equal(
     await page
       .locator(".brand-icon")
-      .evaluateAll((images) => images.length > 0 && images.every((image) => image.naturalWidth > 0)),
+      .evaluateAll(
+        (images) =>
+          images.length > 0 && images.every((image) => image.naturalWidth > 0),
+      ),
     true,
   );
   await page.getByRole("button", { name: "Settings", exact: true }).click();
