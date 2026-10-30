@@ -10,7 +10,7 @@ Requires administrator PowerShell, Node 22.16 or newer, an existing Stremio inst
 
 The volume contains App, Data, Backups, Packages, Temp and Runtime directories. Persistent profile state lives in `Data\still.sqlite`; media cleanup only removes Runtime. The database has a 256 MiB page limit, full synchronous commits and a bounded retained journal. Online backups refresh hourly and retain seven daily snapshots. Backups are checkpointed into single-file SQLite snapshots before rotation.
 
-Permanent torrent caching is disabled. The supervisor pauses the engine and clears its disposable Runtime directory when available space drops below 1 GiB. The 8 GiB volume constrains app data, media work files and backups together, with margin below 10 decimal GB. A few small launcher/configuration files live alongside the image. Existing Node and Stremio program files are reused in place.
+The engine keeps a temporary 2 GiB seek cache (its default) in Runtime, which is cleared whenever the engine restarts. The supervisor pauses the engine and clears its disposable Runtime directory when available space drops below 1 GiB. The 8 GiB volume constrains app data, media work files and backups together, with margin below 10 decimal GB. A few small launcher/configuration files live alongside the image. Existing Node and Stremio program files are reused in place.
 
 ## Prepare and deploy
 

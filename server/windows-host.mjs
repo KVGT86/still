@@ -92,7 +92,6 @@ function reconcile() {
         SETTINGS_PATH: runtime,
         TEMP: runtime,
         TMP: runtime,
-        DISABLE_CACHING: "1",
         CASTING_DISABLED: "1",
         NO_HTTPS_SERVER: "1",
         NO_NETWORK_INTERFACES: "1",
