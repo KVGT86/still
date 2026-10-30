@@ -1,3 +1,4 @@
+import { LoadScreen } from "./LoadScreen";
 import { useEffect, useRef, useState } from "react";
 import type Hls from "hls.js";
 import type { Meta, Stream } from "./types";
@@ -36,9 +37,10 @@ export function Player(p: Props) {
     [advanced, setAdvanced] = useState(false),
     [caption, setCaption] = useState(p.settings.subtitles),
     [countdown, setCountdown] = useState<number | null>(null),
-    [status, setStatus] = useState(
-      p.source.infoHash ? "Finding peers and preparing video…" : "Connecting…",
-    );
+    [status, setStatus] = useState(""),
+    [loaded, setLoaded] = useState(false),
+    [covered, setCovered] = useState(true),
+    [floor, setFloor] = useState(0.5);
   useEffect(() => {
     const v = video.current!;
     let hls: Hls | undefined;
@@ -57,6 +59,7 @@ export function Player(p: Props) {
     };
     window.stillProgress = (data) => {
       ready = true;
+      setLoaded(true);
       clearTimeout(startup);
       setCurrent(data.position);
       setDuration(data.duration);
@@ -82,6 +85,7 @@ export function Player(p: Props) {
         JSON.stringify({
           url: p.url,
           title: p.meta.name,
+          art: p.meta.background || p.meta.poster || "",
           position: p.position,
           headers: p.source.behaviorHints?.proxyHeaders?.request || {},
           audio: p.settings.audio,
@@ -114,6 +118,7 @@ export function Player(p: Props) {
     };
     const canPlay = () => {
       ready = true;
+      setLoaded(true);
       clearTimeout(startup);
       setStatus("");
     };
@@ -144,6 +149,8 @@ export function Player(p: Props) {
           );
           hls.loadSource(p.url);
           hls.attachMedia(v);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => setFloor(0.75));
+          hls.on(Hls.Events.FRAG_LOADED, () => setFloor(0.9));
           hls.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) fail("The HLS source failed.");
           });
@@ -265,6 +272,19 @@ export function Player(p: Props) {
             />
           ))}
       </video>
+      {covered && (
+        <LoadScreen
+          inPlayer
+          art={p.meta.background || p.meta.poster}
+          title={p.meta.name}
+          label={p.source.infoHash ? "Finding peers" : "Connecting"}
+          floor={floor}
+          ceil={0.92}
+          done={loaded}
+          onDone={() => setCovered(false)}
+          onCancel={p.onClose}
+        />
+      )}
       {status && <div className="player-status">{status}</div>}
       {countdown !== null && (
         <div className="up-next">

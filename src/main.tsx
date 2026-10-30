@@ -26,6 +26,7 @@ import {
 } from "../shared/domain.mjs";
 import { readLocal, useProfileStore } from "./store";
 import { Player } from "./Player";
+import { LoadScreen } from "./LoadScreen";
 import { Icon, Avatar, avatarOptions, type IconName } from "./Icon";
 import "./style.css";
 const demoMeta: Meta = {
@@ -199,7 +200,7 @@ function App() {
     [season, setSeason] = useState(1),
     [resolving, setResolving] = useState(false),
     [loadTitle, setLoadTitle] = useState<Meta | null>(null),
-    [stage, setStage] = useState("");
+    [stage, setStage] = useState({ label: "", floor: 0, ceil: 0.3 });
   const [sources, setSources] = useState<{
       meta: Meta;
       videoId: string;
@@ -518,7 +519,7 @@ function App() {
     });
     setResolving(true);
     setLoadTitle(meta);
-    setStage("Finding sources…");
+    setStage({ label: "Finding sources", floor: 0.04, ceil: 0.3 });
     setError("");
     const list = demo
       ? [demoSource]
@@ -543,11 +544,13 @@ function App() {
   ) {
     if (source.infoHash) {
       setResolving(true);
-      setStage(
-        failed.length
-          ? `Trying another source (${failed.length + 1})…`
-          : "Connecting to the streaming engine…",
-      );
+      setStage({
+        label: failed.length
+          ? `Trying another source (${failed.length + 1})`
+          : "Connecting to the streaming engine",
+        floor: 0.3,
+        ceil: 0.5,
+      });
     }
     try {
       // Fetched alongside the stream URL so the player opens once, with subtitles, never restarts for them.
@@ -974,23 +977,14 @@ function App() {
         </div>
       )}
       {resolving && loadTitle && (
-        <div
-          className="load-screen"
-          role="dialog"
-          aria-label="Preparing playback"
-          style={{
-            backgroundImage: `url("${loadTitle.background || loadTitle.poster || ""}")`,
-          }}
-        >
-          <div className="load-card" role="status">
-            <span className="load-ring" aria-hidden="true" />
-            <h2>{loadTitle.name}</h2>
-            <p>{stage}</p>
-            <button autoFocus onClick={cancelLoad}>
-              Cancel
-            </button>
-          </div>
-        </div>
+        <LoadScreen
+          art={loadTitle.background || loadTitle.poster}
+          title={loadTitle.name}
+          label={stage.label}
+          floor={stage.floor}
+          ceil={stage.ceil}
+          onCancel={cancelLoad}
+        />
       )}
       {error.trim() && (
         <div className="toast" role="alert">

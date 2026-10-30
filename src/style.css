@@ -878,49 +878,112 @@ main {
   z-index: 150;
   display: grid;
   place-items: center;
-  background-size: cover;
-  background-position: center;
+  overflow: hidden;
+  background: #101a15;
+  transition: opacity 0.5s ease;
   animation: load-in 0.25s ease-out;
 }
-.load-screen::before {
-  content: "";
+.load-screen.in-player {
+  position: absolute;
+  z-index: 6;
+}
+.load-screen.done {
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0.35s;
+}
+.load-art {
   position: absolute;
   inset: 0;
-  background: #101a15d9;
-  backdrop-filter: blur(18px) saturate(110%);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* The frosted copy is blurred once and only its opacity animates, which stays cheap on TV chips. */
+.load-art.frost {
+  filter: blur(34px) saturate(0.8);
+  transform: scale(1.12);
+  transition: opacity 0.6s ease;
+}
+.load-glass {
+  position: absolute;
+  inset: 0;
+  background: #101a15;
+  transition: opacity 0.6s ease;
 }
 .load-card {
   position: relative;
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 8px;
   text-align: center;
   color: #fff;
   max-width: 70vw;
+  text-shadow: 0 2px 18px #0008;
+}
+.load-dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: #ffffff1f;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 40px #0004;
+  animation: load-breathe 2.4s ease-in-out infinite;
+}
+.load-dial::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(#fff calc(var(--p) * 1%), #ffffff33 0);
+  -webkit-mask: radial-gradient(
+    closest-side,
+    transparent calc(100% - 6px),
+    #000 calc(100% - 5px)
+  );
+  mask: radial-gradient(
+    closest-side,
+    transparent calc(100% - 6px),
+    #000 calc(100% - 5px)
+  );
+}
+.load-dial b {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+.load-dial b::after {
+  content: "%";
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 2px;
 }
 .load-card h2 {
   font-size: clamp(22px, 2.4vw, 36px);
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .load-card p {
-  color: #ffffffb3;
+  color: #ffffffcc;
   font-size: 14px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
 }
 .load-card button {
-  margin-top: 14px;
+  margin-top: 16px;
   padding: 8px 22px;
   border: 1px solid #ffffff55;
   border-radius: 999px;
   background: #ffffff18;
   color: #fff;
 }
-.load-ring {
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  border: 3px solid #ffffff2e;
-  border-top-color: #fff;
-  animation: still-spin 0.9s linear infinite;
+@keyframes load-breathe {
+  50% {
+    transform: scale(1.04);
+  }
 }
 @keyframes load-in {
   from {
@@ -928,8 +991,8 @@ main {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .load-ring {
-    animation-duration: 3s;
+  .load-dial {
+    animation: none;
   }
   .toast,
   .load-screen {
