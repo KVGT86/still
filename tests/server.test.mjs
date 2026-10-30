@@ -25,6 +25,13 @@ test("service isolates accounts, protects PIN data, merges changes and confirms 
     return { status: r.status, data: await r.json().catch(() => null) };
   };
   try {
+    const health = await fetch(base + "/health");
+    assert.equal(health.headers.get("x-frame-options"), "DENY");
+    assert.equal(health.headers.get("referrer-policy"), "no-referrer");
+    assert.match(
+      health.headers.get("content-security-policy"),
+      /script-src 'self'/,
+    );
     assert.equal((await call("/profiles")).status, 401);
     const a = (await call("/session", { authKey: "alice" })).data.token,
       b = (await call("/session", { authKey: "bob" })).data.token;
@@ -81,6 +88,8 @@ test("service isolates accounts, protects PIN data, merges changes and confirms 
       200,
     );
     assert.equal((await call("/profiles", undefined, a)).data.length, 0);
+    assert.equal((await call("/session/revoke", {}, a)).status, 200);
+    assert.equal((await call("/profiles", undefined, a)).status, 401);
   } finally {
     await new Promise((r) => server.close(r));
     close();

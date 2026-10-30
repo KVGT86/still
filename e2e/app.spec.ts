@@ -134,6 +134,73 @@ test("Continue Watching tiers the latest item, next five and earlier items", asy
     page.locator(".continue-card.featured").getByText("Film 2"),
   ).toBeVisible();
 });
+test("household profile chooser contains no real account data", async ({
+  page,
+}) => {
+  let revoked = false;
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "still.service",
+      JSON.stringify("https://profiles.test"),
+    );
+  });
+  await page.route("https://api.strem.io/api/**", async (route) => {
+    const method = route.request().url().split("/").pop();
+    await route.fulfill({
+      json: {
+        result:
+          method === "login"
+            ? {
+                authKey: "household-key",
+                user: {
+                  _id: "household-account",
+                  email: "viewer@example.test",
+                },
+              }
+            : { addons: [] },
+      },
+    });
+  });
+  await page.route("https://link.stremio.com/**", (route) =>
+    route.fulfill({
+      json: { result: { code: "TEST", link: "https://example.test/link" } },
+    }),
+  );
+  await page.route("https://profiles.test/api/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/session/revoke") revoked = true;
+    await route.fulfill({
+      json:
+        url.pathname === "/api/session"
+          ? { token: "service-token" }
+          : url.pathname === "/api/session/revoke"
+            ? { ok: true }
+            : [
+                { id: "one", name: "Living room", avatar: "◒", locked: false },
+                { id: "two", name: "Guest", avatar: "✦", locked: true },
+              ],
+    });
+  });
+  await page.goto("http://localhost:5173");
+  await page.getByLabel("Email address").fill("viewer@example.test");
+  await page.getByLabel("Password", { exact: true }).fill("fixture-password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Who’s watching?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Living room Profile" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Guest PIN protected" }),
+  ).toBeVisible();
+  await page.screenshot({ path: "artifacts/profiles-light.png" });
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Sign in to Stremio" }),
+  ).toBeVisible();
+  await expect.poll(() => revoked).toBe(true);
+});
 test("portrait displays rotate message", async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 1280 });
   await page.goto("http://localhost:5173");
