@@ -103,12 +103,12 @@ Each device derives a maximum supported video quality. The app detects the devic
 Automatic source selection follows this order:
 
 1. Exclude sources above the device's configured quality ceiling.
-2. Require the profile's preferred audio language.
-3. Prefer the strongest quality available within the device ceiling.
+2. Never exclude a source for its language, because add-ons rarely tag it. Sources clearly tagged with a different language than the profile's preferred audio language are tried last.
+3. Prefer sources with a healthy swarm (at least 15 peers), then the strongest quality available within the device ceiling.
 4. Rank otherwise suitable sources by user availability, such as peers or seed count when the addon exposes it.
 5. Apply the preferred subtitle language when available; subtitles are optional and never prevent automatic playback.
 
-If no source satisfies the mandatory constraints, the app shows every available source for manual selection. It must not silently relax the requirements.
+If no source fits the quality ceiling, the app shows every available source for manual selection. It must not silently relax the ceiling.
 
 If the selected automatic source fails, the app tries the next matching ranked source. When every matching source fails, it opens the complete manual list and marks each failed source.
 
@@ -155,7 +155,7 @@ A user launches the app, chooses a profile, lands on Continue Watching, resumes 
 
 ### Automatic source success
 
-A selected title has several sources. The client rejects sources above the device quality ceiling and those missing the preferred audio language, ranks the remaining sources by quality and availability, applies preferred subtitles when present, and starts the best match.
+A selected title has several sources. The client rejects sources above the device quality ceiling, ranks the remaining sources by language fit, swarm health, quality and availability, applies preferred subtitles when present, and starts the best match.
 
 ### Automatic source failure
 

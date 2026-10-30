@@ -6,7 +6,7 @@
 2. Sign in with the same Stremio account used on your televisions. Use the QR code or email/password. In the Linux app, the sign-in link opens in your normal browser.
 3. Select your profile. The status at the top-right should say `STILL / PERSONAL`, not `INTERACTIVE PREVIEW`.
 4. Open Recommended or Search. These screens now query the addons already configured on that account. Still does not install or configure addons.
-5. Open a movie or episode. Set the audio language and maximum quality in Settings, then press Play. Sources with unknown audio or resolution are available for manual selection, but cannot be selected automatically.
+5. Open a movie or episode. Set the audio language and maximum quality in Settings, then press Play. Sources with an unknown resolution are available for manual selection, but cannot be selected automatically. Sources in another language are tried last.
 
 The labelled Big Buck Bunny preview is separate. Successfully playing it verifies the player but does not verify your Stremio account or addons.
 

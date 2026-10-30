@@ -48,7 +48,7 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 
 - Home containing a large latest item, five recent items, then earlier viewing history; Recommended, Search, Saved and Settings stay in the sidebar.
 - Stremio login and QR linking, existing addon catalogs, metadata, episodes, streams and subtitles.
-- Automatic source selection with mandatory known audio language and a device quality ceiling. Unknown metadata is kept for manual selection. Highest resolution within the ceiling is preferred, then reported peers/seeders; this is availability metadata, not telemetry gathered from other Still users.
+- Automatic source selection with a device quality ceiling. Language never excludes a source; sources tagged with a different language are tried last. Unknown resolution is kept for manual selection. Sources with a healthy swarm come first, then the highest resolution within the ceiling, then reported peers/seeders; this is availability metadata, not telemetry gathered from other Still users.
 - Automatic fallback through matching sources, then a complete manual list with failures marked.
 - Profile preferences for audio, optional subtitles and autoplay: on, off, or 07:00–22:00 device local time.
 - Continue Watching begins at 2%; completion at 95% queues the next released unwatched episode. Manual removal does not mark watched.

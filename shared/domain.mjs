@@ -160,22 +160,18 @@ export function sourceInfo(stream) {
 const MIN_HEALTHY_PEERS = 15;
 export function rankSources(streams, audio, maxQuality) {
   // Unknown resolution cannot prove the quality ceiling; keep it for manual selection.
-  // Add-ons rarely tag English, so untagged sources count as English, ranked after tagged ones.
+  // Language never excludes a source (add-ons rarely tag it); sources clearly in another language go last.
   const wanted = languageCode(audio);
-  const tagged = (s) => s.info.languages.length > 0;
+  const foreign = (s) =>
+    s.info.languages.length > 0 && !s.info.languages.includes(wanted);
   const healthy = (s) => s.info.peers >= MIN_HEALTHY_PEERS;
   return streams
     .map((s, i) => ({ ...s, key: s.key || String(i), info: sourceInfo(s) }))
-    .filter(
-      (s) =>
-        s.info.quality > 0 &&
-        s.info.quality <= maxQuality &&
-        (s.info.languages.includes(wanted) || (wanted === "en" && !tagged(s))),
-    )
+    .filter((s) => s.info.quality > 0 && s.info.quality <= maxQuality)
     .sort(
       (a, b) =>
+        foreign(a) - foreign(b) ||
         healthy(b) - healthy(a) ||
-        tagged(b) - tagged(a) ||
         b.info.quality - a.info.quality ||
         b.info.peers - a.info.peers,
     );

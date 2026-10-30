@@ -35,7 +35,7 @@ test("scheduled autoplay checks the 07:00 and 22:00 boundaries", () => {
   assert.equal(autoplayAllowed("on", new Date(2026, 0, 1, 23)), true);
   assert.equal(autoplayAllowed("off"), false);
 });
-test("automatic ranking needs a known resolution; healthy swarms and tagged audio come first", () => {
+test("automatic ranking ignores language gaps, needs a known resolution and prefers healthy swarms", () => {
   const streams = [
     { key: "4k-thin", quality: 2160, languages: ["en"], seeders: 3 },
     { key: "1080-big", quality: 1080, languages: ["en"], seeders: 800 },
@@ -46,15 +46,11 @@ test("automatic ranking needs a known resolution; healthy swarms and tagged audi
   ];
   assert.deepEqual(
     rankSources(streams, "en", 2160).map((x) => x.key),
-    ["1080-big", "720-big", "untagged", "4k-thin"],
+    ["untagged", "1080-big", "720-big", "4k-thin", "french"],
   );
   assert.deepEqual(
     rankSources(streams, "en", 1080).map((x) => x.key),
-    ["1080-big", "720-big", "untagged"],
-  );
-  assert.deepEqual(
-    rankSources(streams, "fr", 1080).map((x) => x.key),
-    ["french"],
+    ["untagged", "1080-big", "720-big", "french"],
   );
 });
 test("merging an older copy returns the same object; newer data returns a new one", () => {
