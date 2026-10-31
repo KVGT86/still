@@ -832,9 +832,10 @@ main {
   gap: 3px;
 }
 .segmented button {
+  flex: 1;
   border: 0;
   background: transparent;
-  padding: 9px 17px;
+  padding: 9px 12px;
   font-size: 12px;
 }
 .segmented button[aria-pressed="true"] {

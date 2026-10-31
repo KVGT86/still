@@ -1,10 +1,17 @@
 export const defaults = {
   theme: "light",
+  interfaceSounds: false,
   audio: "en",
   subtitle: "en",
   subtitles: true,
   autoplay: "scheduled",
 };
+export function themeAtTime(mode, date = new Date()) {
+  if (mode === "dark") return "dark";
+  if (mode !== "scheduled") return "light";
+  const hour = date.getHours();
+  return hour >= 7 && hour < 19 ? "light" : "dark";
+}
 export function blankState() {
   return {
     saved: {},

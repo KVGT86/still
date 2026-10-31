@@ -9,6 +9,7 @@ import {
   changedMetas,
   mergeState,
   recommend,
+  themeAtTime,
 } from "../shared/domain.mjs";
 const meta = {
   id: "series",
@@ -34,6 +35,17 @@ test("scheduled autoplay checks the 07:00 and 22:00 boundaries", () => {
     );
   assert.equal(autoplayAllowed("on", new Date(2026, 0, 1, 23)), true);
   assert.equal(autoplayAllowed("off"), false);
+});
+test("scheduled theme is light from 07:00 until 19:00", () => {
+  for (const [hour, expected] of [
+    [6, "dark"],
+    [7, "light"],
+    [18, "light"],
+    [19, "dark"],
+  ])
+    assert.equal(themeAtTime("scheduled", new Date(2026, 0, 1, hour)), expected);
+  assert.equal(themeAtTime("light", new Date(2026, 0, 1, 23)), "light");
+  assert.equal(themeAtTime("dark", new Date(2026, 0, 1, 12)), "dark");
 });
 test("automatic ranking ignores language gaps, needs a known resolution and prefers healthy swarms", () => {
   const streams = [
@@ -124,11 +136,14 @@ test("theme defaults to light and follows the newest profile settings", () => {
   delete oldState.settings.theme;
   const migrated = mergeState(oldState, blankState());
   assert.equal(migrated.settings.theme, "light");
+  assert.equal(migrated.settings.interfaceSounds, false);
 
   const dark = blankState();
   dark.settings.theme = "dark";
+  dark.settings.interfaceSounds = true;
   dark.settingsAt = 2;
   assert.equal(mergeState(migrated, dark).settings.theme, "dark");
+  assert.equal(mergeState(migrated, dark).settings.interfaceSounds, true);
 
   const legacyRemote = blankState();
   delete legacyRemote.settings.theme;

@@ -65,6 +65,10 @@ test("preview navigates, saves titles, changes preferences and themes", async ({
   await capture(page, "artifacts/saved-light.png");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await capture(page, "artifacts/settings-light.png");
+  const sounds = page.getByRole("switch", { name: "Interface sounds" });
+  await expect(sounds).toHaveAttribute("aria-checked", "false");
+  await sounds.click();
+  await expect(sounds).toHaveAttribute("aria-checked", "true");
   const toggle = page.getByRole("switch", { name: "Subtitles by default" });
   const knob = toggle.locator("span");
   const wasChecked = (await toggle.getAttribute("aria-checked")) === "true";
@@ -76,6 +80,18 @@ test("preview navigates, saves titles, changes preferences and themes", async ({
   expect(right!.x > left!.x).toBe(!wasChecked);
   expect(right!.x + right!.width).toBeLessThanOrEqual(
     (await toggle.boundingBox())!.x + (await toggle.boundingBox())!.width,
+  );
+  await page.getByRole("button", { name: "Automatic", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Automatic", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const expectedTheme = await page.evaluate(() => {
+    const hour = new Date().getHours();
+    return hour >= 7 && hour < 19 ? "light" : "dark";
+  });
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-theme",
+    expectedTheme,
   );
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

@@ -23,11 +23,13 @@ import {
   recordProgress,
   releasedEpisodes,
   sourceInfo,
+  themeAtTime,
 } from "../shared/domain.mjs";
 import { readLocal, useProfileStore } from "./store";
 import { Player } from "./Player";
 import { LoadScreen } from "./LoadScreen";
 import { Icon, Avatar, avatarOptions, type IconName } from "./Icon";
+import { playInterfaceSound } from "./sounds";
 import "./style.css";
 const demoMeta: Meta = {
   id: "still-demo",
@@ -237,8 +239,24 @@ function App() {
     return () => window.removeEventListener("pointermove", highlight);
   }, []);
   useEffect(() => {
-    document.documentElement.dataset.theme = data.settings.theme;
+    const apply = () => {
+      document.documentElement.dataset.theme = themeAtTime(data.settings.theme);
+    };
+    apply();
+    const timer = window.setInterval(apply, 60_000);
+    return () => window.clearInterval(timer);
   }, [data.settings.theme]);
+  useEffect(() => {
+    if (!data.settings.interfaceSounds) return;
+    const activate = (event: MouseEvent) => {
+      const control = (event.target as Element)?.closest(
+        "button,a[href],input[type=checkbox]",
+      );
+      if (control && !control.closest(".player")) playInterfaceSound("activate");
+    };
+    document.addEventListener("click", activate);
+    return () => document.removeEventListener("click", activate);
+  }, [data.settings.interfaceSounds]);
   useEffect(() => {
     const expired = () => {
       setSession(null);
@@ -339,6 +357,7 @@ function App() {
         !form
       ) {
         e.preventDefault();
+        if (data.settings.interfaceSounds) playInterfaceSound("back");
         if (resolving) cancelLoad();
         else if (play) setPlay(null);
         else if (sources) {
@@ -406,15 +425,27 @@ function App() {
         })
         .filter((x) => x.along > 5)
         .sort((a, b) => a.along + a.cross * 3 - (b.along + b.cross * 3));
-      candidates[0]?.item.focus();
-      candidates[0]?.item.scrollIntoView({
+      const target = candidates[0]?.item;
+      target?.focus();
+      target?.scrollIntoView({
         block: "nearest",
         inline: "nearest",
       });
+      if (target && !target.closest(".player") && data.settings.interfaceSounds) {
+        playInterfaceSound("move");
+      }
     };
     window.addEventListener("keydown", remote);
     return () => window.removeEventListener("keydown", remote);
-  }, [page, detail, dialog, play, sources, resolving]);
+  }, [
+    page,
+    detail,
+    dialog,
+    play,
+    sources,
+    resolving,
+    data.settings.interfaceSounds,
+  ]);
   useEffect(() => {
     if (!error) return;
     const timer = setTimeout(() => setError(""), 9000);
@@ -1708,19 +1739,44 @@ function Settings(p: any) {
       </div>
       <section>
         <h2>Appearance</h2>
-        <Setting label="Theme" text="Light by default.">
+        <Setting
+          label="Theme"
+          text="Automatic uses device time: light from 7 am to 7 pm, dark overnight."
+        >
           <div className="segmented">
-            {["light", "dark"].map((t) => (
+            {[
+              ["light", "Light", "sun"],
+              ["scheduled", "Automatic", "clock"],
+              ["dark", "Dark", "moon"],
+            ].map(([value, label, icon]) => (
               <button
-                key={t}
-                aria-pressed={data.settings.theme === t}
-                onClick={() => set("theme", t)}
+                key={value}
+                aria-pressed={data.settings.theme === value}
+                onClick={() => set("theme", value)}
               >
-                <Icon name={t === "light" ? "sun" : "moon"} size={16} />
-                {t === "light" ? "Light" : "Dark"}
+                <Icon name={icon as IconName} size={16} />
+                {label}
               </button>
             ))}
           </div>
+        </Setting>
+        <Setting
+          label="Interface sounds"
+          text="Warm navigation and action sounds, remembered for this profile."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="Interface sounds"
+            aria-checked={data.settings.interfaceSounds}
+            onClick={() => {
+              const enabled = !data.settings.interfaceSounds;
+              set("interfaceSounds", enabled);
+              if (enabled) playInterfaceSound("activate");
+            }}
+          >
+            <span />
+          </button>
         </Setting>
       </section>
       <section>

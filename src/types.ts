@@ -54,6 +54,7 @@ export type ProfileState = {
   feedback: Record<string, { meta: Meta; value: string; updatedAt: number }>;
   settings: {
     theme: string;
+    interfaceSounds: boolean;
     audio: string;
     subtitle: string;
     subtitles: boolean;
