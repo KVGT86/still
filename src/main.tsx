@@ -1,5 +1,6 @@
 import "./polyfills";
 import appIcon from "./assets/app-icon.svg";
+import rewaWordmark from "./assets/rewa-wordmark.png";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -1445,9 +1446,19 @@ function App() {
 }
 function Brand() {
   return (
-    <div className="brand">
-      <img className="brand-icon" src={appIcon} alt="" width="38" height="38" />{" "}
-      still<span className="brand-dot">.</span>
+    <div className="brand" role="img" aria-label="Still. Built by Rewa.">
+      <img className="brand-icon" src={appIcon} alt="" width="38" height="38" />
+      <span className="brand-lockup">
+        <span className="brand-name">
+          still<span className="brand-dot">.</span>
+        </span>
+        <span className="brand-maker">
+          <span>by</span>
+          <span className="rewa-mark">
+            <img src={rewaWordmark} alt="" />
+          </span>
+        </span>
+      </span>
     </div>
   );
 }

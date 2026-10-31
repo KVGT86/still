@@ -197,6 +197,42 @@ strong {
   font-weight: 650;
   white-space: nowrap;
 }
+.brand-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 0.82;
+}
+.brand-name {
+  display: block;
+}
+.brand-maker {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 5px -2px -4px 0;
+  color: var(--muted);
+  font-family: "DM Sans", sans-serif;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.rewa-mark {
+  display: block;
+  width: 58px;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #f7f7f2;
+}
+.rewa-mark img {
+  display: block;
+  width: 64px;
+  height: auto;
+  transform: translate(-3px, -5px);
+}
 .brand-icon {
   flex-shrink: 0;
   margin-right: 10px;
