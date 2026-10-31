@@ -1854,7 +1854,7 @@ function Settings(p: any) {
         )}
       </section>
       <p className="fine-print">
-        Still 0.2.2 · An independent Stremio client.
+        Still 0.2.3 · An independent Stremio client.
         <br />
         Configured addons supply catalogs and sources. No content is hosted by
         Still.
