@@ -1650,7 +1650,7 @@ function Login({
             >
               Refresh code
             </button>
-            {link && (
+            {link && !("webOSSystem" in window) && (
               <a href={link} target="_blank" rel="noreferrer">
                 Open sign-in link
                 <Icon name="external" size={13} />

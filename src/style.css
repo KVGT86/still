@@ -527,6 +527,7 @@ main {
   position: relative;
   width: 100%;
   aspect-ratio: 1.9;
+  --ar: 1.9;
   border: 0;
   border-radius: 15px;
   overflow: hidden;
@@ -545,12 +546,14 @@ main {
 }
 .featured .art-button {
   aspect-ratio: 2.75;
+  --ar: 2.75;
 }
 .featured .art-button img {
   object-position: center 44%;
 }
 .recent .art-button {
   aspect-ratio: 1.55;
+  --ar: 1.55;
 }
 .art-shade {
   position: absolute;
@@ -1672,6 +1675,7 @@ form .primary {
   }
   .featured .art-button {
     aspect-ratio: 2.15;
+    --ar: 2.15;
   }
   .continue-row {
     gap: 10px;
@@ -1742,6 +1746,7 @@ form .primary {
   }
   .featured .art-button {
     aspect-ratio: 3.1;
+    --ar: 3.1;
   }
   .login-panel {
     padding: 25px 4vw;
@@ -1794,5 +1799,13 @@ form .primary {
   }
   .portrait-notice p {
     color: var(--muted);
+  }
+}
+/* Chromium 87 (webOS) has no aspect-ratio; a padded spacer gives the same height. */
+@supports not (aspect-ratio: 1) {
+  .art-button::before {
+    content: "";
+    display: block;
+    padding-top: calc(100% / var(--ar, 1.9));
   }
 }
