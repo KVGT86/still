@@ -49,7 +49,7 @@ await writeFile(
   "public/licenses/THIRD-PARTY.txt",
   sections.join("\n\n" + "=".repeat(72) + "\n\n"),
 );
-for (const font of ["Manrope", "DMSans"])
+for (const font of ["Manrope", "DMSans", "Montserrat"])
   await writeFile(
     `public/licenses/${font}-OFL.txt`,
     await readFile(`src/fonts/${font}-OFL.txt`),

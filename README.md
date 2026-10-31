@@ -4,7 +4,7 @@
   <img src="src/assets/app-icon.svg" alt="Still app icon" width="120">
 </p>
 <p align="center">
-  <sub>Built by <img src="src/assets/rewa-wordmark.png" alt="Rewa." width="64"></sub>
+  <sub>Built by <strong>Rewa.</strong></sub>
 </p>
 
 Still is a light-first, landscape Stremio client for Linux, Android TV, Google TV, Android tablets and LG webOS. It keeps Continue Watching prominent, removes most of the original interface clutter, and adds optional household profiles.

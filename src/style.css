@@ -12,6 +12,13 @@
   font-display: swap;
   src: url("./fonts/Manrope.woff2") format("woff2");
 }
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/Montserrat.woff2") format("woff2");
+}
 :root {
   font-family: "DM Sans", sans-serif;
   color: #252a24;
@@ -208,7 +215,7 @@ strong {
 }
 .brand-maker {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 3px;
   margin: 5px -2px -4px 0;
   color: var(--muted);
@@ -217,21 +224,13 @@ strong {
   font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1;
-  text-transform: uppercase;
 }
 .rewa-mark {
-  display: block;
-  width: 58px;
-  height: 16px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: #f7f7f2;
-}
-.rewa-mark img {
-  display: block;
-  width: 64px;
-  height: auto;
-  transform: translate(-3px, -5px);
+  color: var(--text);
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
 }
 .brand-icon {
   flex-shrink: 0;

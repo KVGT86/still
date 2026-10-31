@@ -1,6 +1,5 @@
 import "./polyfills";
 import appIcon from "./assets/app-icon.svg";
-import rewaWordmark from "./assets/rewa-wordmark.png";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -1454,9 +1453,7 @@ function Brand() {
         </span>
         <span className="brand-maker">
           <span>by</span>
-          <span className="rewa-mark">
-            <img src={rewaWordmark} alt="" />
-          </span>
+          <span className="rewa-mark">Rewa.</span>
         </span>
       </span>
     </div>
