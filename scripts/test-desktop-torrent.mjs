@@ -71,7 +71,7 @@ try {
   await page.getByLabel("Email address").fill("fixture@example.test");
   await page.getByLabel("Password", { exact: true }).fill("fixture");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("button", { name: "fixture Profile" }).click();
+  await page.getByRole("button", { name: "fixture", exact: true }).click();
   await page.getByRole("button", { name: "Recommended", exact: true }).click();
   await page.getByRole("button", { name: meta.name }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
