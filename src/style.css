@@ -232,6 +232,9 @@ strong {
   font-weight: 800;
   letter-spacing: -0.035em;
 }
+.rewa-dot {
+  color: #518dc1;
+}
 .brand-icon {
   flex-shrink: 0;
   margin-right: 10px;

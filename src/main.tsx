@@ -1453,7 +1453,9 @@ function Brand() {
         </span>
         <span className="brand-maker">
           <span>by</span>
-          <span className="rewa-mark">Rewa.</span>
+          <span className="rewa-mark">
+            Rewa<span className="rewa-dot">.</span>
+          </span>
         </span>
       </span>
     </div>
