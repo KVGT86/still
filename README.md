@@ -48,7 +48,7 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 
 - Home containing a large latest item, five recent items, then earlier viewing history; Recommended, Search, Saved and Settings stay in the sidebar.
 - Stremio login and QR linking, existing addon catalogues, metadata, episodes, streams and subtitles.
-- Automatic source selection with a device quality ceiling. Language never excludes a source; sources tagged with a different language are tried last. Unknown resolution is kept for manual selection. Sources with a healthy swarm come first, then the highest resolution within the ceiling, then reported peers/seeders; this is availability metadata, not telemetry gathered from other Still users.
+- Automatic source selection with a device quality ceiling and runtime codec checks. Language never excludes a source; sources tagged with a different language are tried last. Unknown resolution is kept for manual selection. Sources with unsupported declared codecs are tried last; among compatible sources, healthy swarms and hardware-decoded formats take priority before resolution and reported peers/seeders. This is device capability and availability metadata, not telemetry gathered from other Still users.
 - Automatic fallback through matching sources, then a complete manual list with failures marked.
 - Profile preferences for audio, optional subtitles and autoplay: on, off, or 07:00–22:00 device local time.
 - Continue Watching begins at 2%; completion at 95% queues the next released unwatched episode. Manual removal does not mark watched.
@@ -161,14 +161,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.2.4-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.2.5-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.2.4-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.2.5-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -219,7 +219,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.2.4_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.2.5_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 

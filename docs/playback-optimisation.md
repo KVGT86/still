@@ -5,16 +5,19 @@ The LG changes in this revision fix file-origin loading and layout, not video pl
 
 ## Confirmed paths
 
-| Device | Torrent path | Potential bottleneck |
-| --- | --- | --- |
-| Android TV/tablet | Remote Stremio engine → original media → Media3 | Peers, host-to-TV network, decoder, buffering |
-| LG webOS | Remote engine → original media → native video; one HLS compatibility fallback on failure | Peers, network, decoder; conversion on fallback |
-| Linux | Managed or remote engine → same HLS conversion → browser player | Conversion and peers |
+| Device            | Torrent path                                                                             | Potential bottleneck                            |
+| ----------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Android TV/tablet | Remote Stremio engine → original media → Media3                                          | Peers, host-to-TV network, decoder, buffering   |
+| LG webOS          | Remote engine → original media → native video; one HLS compatibility fallback on failure | Peers, network, decoder; conversion on fallback |
+| Linux             | Managed or remote engine → same HLS conversion → browser player                          | Conversion and peers                            |
 
 Still shares Stremio's account/addon and engine contracts, not its entire player implementation. No measured parity claim is justified yet.
 
 ## Changes under evaluation
 
+- Android reports its installed video and audio decoders and distinguishes hardware from software decoding. Browser and webOS builds probe their native media element for H.264, HEVC, VP9, AV1, AAC, AC-3, E-AC-3, DTS and TrueHD support.
+- Declared unsupported codecs are tried after compatible sources. Healthy swarms still take priority, then hardware-decoded formats. Uncertain sources remain available and are labelled in manual selection.
+- Decoder failures use the existing bounded next-source fallback; Still does not transcode or permanently block a codec.
 - Android targets a 50–90 second in-memory buffer subject to Media3's byte threshold; startup requests 3 seconds and recovery requests 8 seconds. These are targets, not guarantees. No persistent media cache is added.
 - Android touch scrubbing commits one seek on release; remote key seeks remain immediate.
 - HLS.js gets at most two additional network recovery attempts and one media recovery per source. Timers are cancelled on teardown and media recovery retains position.
@@ -24,8 +27,8 @@ Still shares Stremio's account/addon and engine contracts, not its entire player
 
 ## Automated evidence
 
-- 18 Node tests and production TypeScript/Vite build passed.
-- Seven browser checks passed, followed by an additional LG source-exhaustion journey: original media fails, one compatibility session is tried per source, then failures are marked. This simulates webOS detection in Chrome, not an LG decoder.
+- 20 Node tests and production TypeScript/Vite build passed.
+- Eight browser checks passed, including the LG source-exhaustion journey: original media fails, one compatibility session is tried per source, then failures are marked. This simulates webOS detection in Chrome, not an LG decoder.
 - Real loopback BitTorrent integration passed: metadata/pieces, automatic file selection, byte-range seeking, HLS conversion, origin checks and engine-session cleanup.
 - Android debug APK and webOS IPK built. The APK was rebuilt after the Android retry/resume changes.
 - No physical-device comparative results are recorded yet.

@@ -92,6 +92,10 @@ export function sourceInfo(stream) {
     stream.description,
     stream.behaviorHints?.filename,
     stream.quality,
+    stream.videoCodec,
+    stream.videoCodecs,
+    stream.audioCodec,
+    stream.audioCodecs,
   ]
     .filter(Boolean)
     .join(" ");
@@ -162,23 +166,57 @@ export function sourceInfo(stream) {
       text.match(/(?:👤|👥|seeders?\s*[:=]?|peers?\s*[:=]?)\s*(\d+)/i)?.[1] ??
       0,
   );
-  return { quality, languages: [...new Set(languages)], peers };
+  const videoCodec = /\b(?:av1|av01)\b/i.test(text)
+    ? "av1"
+    : /\b(?:h[ .-]?265|hevc|x265)\b/i.test(text)
+      ? "hevc"
+      : /\b(?:vp[ .-]?9|vp09)\b/i.test(text)
+        ? "vp9"
+        : /\b(?:h[ .-]?264|avc|x264)\b/i.test(text)
+          ? "h264"
+          : "";
+  const audioCodec = /\b(?:true[ .-]?hd)\b/i.test(text)
+    ? "truehd"
+    : /\b(?:dts(?:[ .-]?hd)?|dts:x)\b/i.test(text)
+      ? "dts"
+      : /\b(?:e[ .-]?ac[ .-]?3|ddp|dd\+)\b/i.test(text)
+        ? "eac3"
+        : /\b(?:ac[ .-]?3|dolby digital)\b/i.test(text)
+          ? "ac3"
+          : /\baac\b/i.test(text)
+            ? "aac"
+            : "";
+  return {
+    quality,
+    languages: [...new Set(languages)],
+    peers,
+    videoCodec,
+    audioCodec,
+  };
 }
 const MIN_HEALTHY_PEERS = 15;
-export function rankSources(streams, audio, maxQuality) {
+export function sourceCompatibility(info, codecSupport = {}) {
+  const codecs = [info.videoCodec, info.audioCodec].filter(Boolean);
+  if (!codecs.length || !Object.keys(codecSupport).length) return 1;
+  return Math.min(...codecs.map((codec) => codecSupport[codec] ?? 1));
+}
+export function rankSources(streams, audio, maxQuality, codecSupport = {}) {
   // Unknown resolution cannot prove the quality ceiling; keep it for manual selection.
   // Language never excludes a source (add-ons rarely tag it); sources clearly in another language go last.
   const wanted = languageCode(audio);
   const foreign = (s) =>
     s.info.languages.length > 0 && !s.info.languages.includes(wanted);
   const healthy = (s) => s.info.peers >= MIN_HEALTHY_PEERS;
+  const compatibility = (s) => sourceCompatibility(s.info, codecSupport);
   return streams
     .map((s, i) => ({ ...s, key: s.key || String(i), info: sourceInfo(s) }))
     .filter((s) => s.info.quality > 0 && s.info.quality <= maxQuality)
     .sort(
       (a, b) =>
         foreign(a) - foreign(b) ||
+        (compatibility(a) === 0) - (compatibility(b) === 0) ||
         healthy(b) - healthy(a) ||
+        compatibility(b) - compatibility(a) ||
         b.info.quality - a.info.quality ||
         b.info.peers - a.info.peers,
     );

@@ -6,6 +6,8 @@ import {
   continueItems,
   recordProgress,
   rankSources,
+  sourceCompatibility,
+  sourceInfo,
   changedMetas,
   mergeState,
   recommend,
@@ -43,7 +45,10 @@ test("scheduled theme is light from 07:00 until 19:00", () => {
     [18, "light"],
     [19, "dark"],
   ])
-    assert.equal(themeAtTime("scheduled", new Date(2026, 0, 1, hour)), expected);
+    assert.equal(
+      themeAtTime("scheduled", new Date(2026, 0, 1, hour)),
+      expected,
+    );
   assert.equal(themeAtTime("light", new Date(2026, 0, 1, 23)), "light");
   assert.equal(themeAtTime("dark", new Date(2026, 0, 1, 12)), "dark");
 });
@@ -64,6 +69,28 @@ test("automatic ranking ignores language gaps, needs a known resolution and pref
     rankSources(streams, "en", 1080).map((x) => x.key),
     ["untagged", "1080-big", "720-big", "french"],
   );
+});
+test("codec metadata demotes unsupported sources without hiding manual choices", () => {
+  const streams = [
+    { key: "av1", title: "2160p AV1 AAC", seeders: 100 },
+    {
+      key: "hevc",
+      title: "2160p",
+      videoCodec: "hevc",
+      audioCodec: "eac3",
+      seeders: 100,
+    },
+    { key: "avc", title: "1080p H.264 AAC", seeders: 100 },
+  ];
+  const support = { h264: 2, hevc: 1, av1: 0, aac: 2, eac3: 2 };
+  assert.deepEqual(
+    rankSources(streams, "en", 2160, support).map((stream) => stream.key),
+    ["avc", "hevc", "av1"],
+  );
+  assert.equal(sourceInfo(streams[1]).videoCodec, "hevc");
+  assert.equal(sourceInfo(streams[1]).audioCodec, "eac3");
+  assert.equal(sourceCompatibility(sourceInfo(streams[1]), support), 1);
+  assert.equal(rankSources(streams, "en", 2160, support).length, 3);
 });
 test("merging an older copy returns the same object; newer data returns a new one", () => {
   const a = mergeState(blankState(), {

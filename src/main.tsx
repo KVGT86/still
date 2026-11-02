@@ -23,6 +23,7 @@ import {
   recordProgress,
   releasedEpisodes,
   sourceInfo,
+  sourceCompatibility,
   themeAtTime,
 } from "../shared/domain.mjs";
 import { readLocal, useProfileStore } from "./store";
@@ -52,6 +53,47 @@ const demoSource: Stream = {
   quality: 480,
   languages: ["en"],
 };
+const codecNames: Record<string, string> = {
+  h264: "H.264",
+  hevc: "HEVC",
+  vp9: "VP9",
+  av1: "AV1",
+  aac: "AAC",
+  ac3: "AC-3",
+  eac3: "E-AC-3",
+  dts: "DTS",
+  truehd: "TrueHD",
+};
+function deviceCodecSupport() {
+  try {
+    if (window.StillNative?.codecSupport)
+      return JSON.parse(window.StillNative.codecSupport());
+  } catch {}
+  const media = document.createElement("video");
+  const probes: Record<string, string[]> = {
+    h264: ['video/mp4; codecs="avc1.42E01E"'],
+    hevc: [
+      'video/mp4; codecs="hvc1.1.6.L93.B0"',
+      'video/mp4; codecs="hev1.1.6.L93.B0"',
+    ],
+    vp9: ['video/webm; codecs="vp09.00.10.08"'],
+    av1: ['video/mp4; codecs="av01.0.05M.08"'],
+    aac: ['audio/mp4; codecs="mp4a.40.2"'],
+    ac3: ['audio/mp4; codecs="ac-3"'],
+    eac3: ['audio/mp4; codecs="ec-3"'],
+    dts: ['audio/mp4; codecs="dtsc"'],
+    truehd: ['audio/mp4; codecs="mlpa"'],
+  };
+  return Object.fromEntries(
+    Object.entries(probes).map(([codec, types]) => {
+      const answers = types.map((type) => media.canPlayType(type));
+      return [
+        codec,
+        answers.includes("probably") ? 2 : answers.includes("maybe") ? 1 : 0,
+      ];
+    }),
+  );
+}
 const icons: Record<string, IconName> = {
   Home: "home",
   Recommended: "sparkles",
@@ -163,6 +205,7 @@ function ContinueCard({
   );
 }
 function App() {
+  const codecSupport = useMemo(deviceCodecSupport, []);
   const [session, setSession] = useState<Session | null>(
       readLocal("still.session", null),
     ),
@@ -568,7 +611,12 @@ function App() {
       : await api.streams(addons, meta.type, videoId, controller.signal);
     if (id !== requestId.current) return;
     setResolving(false);
-    const matching = rankSources(list, data.settings.audio, quality);
+    const matching = rankSources(
+      list,
+      data.settings.audio,
+      quality,
+      codecSupport,
+    );
     if (!matching.length) {
       setSources({ meta, videoId, items: list, failed: [] });
       return;
@@ -1208,6 +1256,11 @@ function App() {
               <div className="source-list">
                 {sources.items.map((s) => {
                   const info = sourceInfo(s);
+                  const compatibility = sourceCompatibility(info, codecSupport);
+                  const codecs = [info.videoCodec, info.audioCodec]
+                    .filter(Boolean)
+                    .map((codec) => codecNames[codec] || codec)
+                    .join(" + ");
                   return (
                     <button
                       key={s.key}
@@ -1227,6 +1280,16 @@ function App() {
                         <small>
                           {s.title || s.description || s.url || s.infoHash}
                         </small>
+                        {codecs && (
+                          <small>
+                            {codecs} ·{" "}
+                            {compatibility === 0
+                              ? "May not play"
+                              : compatibility === 2
+                                ? "Device supported"
+                                : "Compatibility uncertain"}
+                          </small>
+                        )}
                       </span>
                       <span>
                         {sources.failed.includes(s.key)
@@ -1933,7 +1996,7 @@ function Settings(p: any) {
         )}
       </section>
       <p className="fine-print">
-        Still 0.2.4 · An independent Stremio client.
+        Still 0.2.5 · An independent Stremio client.
         <br />
         Configured addons supply catalogues and sources. No content is hosted by
         Still.

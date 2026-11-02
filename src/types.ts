@@ -96,6 +96,7 @@ declare global {
     StillNative?: {
       play: (payload: string) => void;
       maxQuality: () => number;
+      codecSupport: () => string;
     };
     stillProgress?: (data: any) => void;
     stillPlaybackEnded?: (ended?: boolean) => void;
