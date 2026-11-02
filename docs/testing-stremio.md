@@ -14,9 +14,9 @@ The live public QR endpoint was checked from the packaged Linux app and returned
 
 ## Check playback
 
-Start with an authorized direct HTTP/HLS source if your configured addons provide one. This requires no Still companion service and no torrent engine.
+Start with an authorised direct HTTP/HLS source if your configured addons provide one. This requires no Still companion service and no torrent engine.
 
-The Linux desktop app now manages its own torrent engine. Leave **Settings → Stremio streaming server** blank, sign in, and choose an authorized torrent source. First use downloads the official engine; subsequent launches reuse it. Allow up to two minutes for a torrent to find peers and prepare playback after installation. An unavailable source still falls back to the next matching source.
+The Linux desktop app now manages its own torrent engine. Leave **Settings → Stremio streaming server** blank, sign in, and choose an authorised torrent source. First use downloads the official engine; subsequent launches reuse it. Allow up to two minutes for a torrent to find peers and prepare playback after installation. An unavailable source still falls back to the next matching source.
 
 On browser, Android and webOS clients, torrent-only sources return an `infoHash` and need a reachable Stremio streaming server. To use an existing official Stremio desktop service on the same device, set **Settings → Stremio streaming server** to:
 
@@ -28,18 +28,18 @@ You can instead use the reachable address of an existing streaming server. The s
 
 Still's managed Linux engine uses its own random loopback port and does not modify another Stremio installation. The profile-service URL is unrelated to this engine.
 
-## Verify account synchronization
+## Verify account synchronisation
 
 1. In single-profile mode, save a title in Still and wait approximately five seconds.
 2. Refresh the standard Stremio web interface and confirm the title appears in its library.
 3. Play past 2%, stop, and check Continue Watching. Reach 95% to mark the item completed and queue the next released episode where available.
-4. For household mode, configure the Still self-hosted service first. Profile changes then synchronize through that service rather than writing back to the shared Stremio account.
+4. For household mode, configure the Still self-hosted service first. Profile changes then synchronise through that service rather than writing back to the shared Stremio account.
 
 ## Understand failures
 
 | Result                          | What to check                                                                                                                            |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| No catalog/search results       | Confirm addons are configured on the same account in standard Stremio. Individual addon failures are intentionally silent.               |
+| No catalogue/search results     | Confirm addons are configured on the same account in standard Stremio. Individual addon failures are intentionally silent.               |
 | No sources available            | The configured addons returned no sources for that movie or episode.                                                                     |
 | Manual source list              | No source proved the required audio/quality match, or all matching sources failed. Your preferences were not relaxed.                    |
 | Source needs a streaming server | Configure a reachable Stremio streaming server for torrent-only sources.                                                                 |
@@ -59,6 +59,6 @@ npm run test:torrent
 npm run test:desktop:torrent
 ```
 
-The account browser test uses fixtures to verify sign-in, addon reads, silent addon failure, source ranking, exhausted-source fallback and Saved behavior. It does not log into your account. The desktop smoke test verifies the app window, isolated renderer, preview, navigation and theme switching.
+The account browser test uses fixtures to verify sign-in, addon reads, silent addon failure, source ranking, exhausted-source fallback and Saved behaviour. It does not log into your account. The desktop smoke test verifies the app window, isolated renderer, preview, navigation and theme switching.
 
 Torrent tests require system FFmpeg to generate an original test video. They run a real loopback BitTorrent seed and HTTP tracker, exchange torrent metadata and video pieces, verify automatic file selection and byte-range seeks, and exercise HLS conversion. The desktop torrent test signs into a fixture account and plays an MKV with AC3 audio through the actual player, checking decoded audio and seeking. It can target an installed bundle with `STILL_PACKAGED_BINARY=artifacts/linux/linux-unpacked/still npm run test:desktop:torrent`. No public swarm or private account is needed for these checks.

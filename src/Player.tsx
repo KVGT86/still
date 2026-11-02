@@ -5,6 +5,8 @@ import type { Meta, Stream } from "./types";
 import { autoplayAllowed } from "../shared/domain.mjs";
 import { languageCode } from "./api";
 import { Icon } from "./Icon";
+import { recoveryBudget } from "../shared/playback.mjs";
+import { torrentHlsDestroyUrl } from "../shared/torrent.mjs";
 type Props = {
   meta: Meta;
   videoId: string;
@@ -41,16 +43,26 @@ export function Player(p: Props) {
     [loaded, setLoaded] = useState(false),
     [covered, setCovered] = useState(true),
     [floor, setFloor] = useState(0.5);
+  const [diagnostics, setDiagnostics] = useState("");
   useEffect(() => {
     const v = video.current!;
     let hls: Hls | undefined;
     let failed = false;
     let ready = false;
     let disposed = false;
+    const recovery = recoveryBudget();
+    let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stalls = 0;
+    let stalledAt = 0;
+    let stalledMs = 0;
+    const startedAt = performance.now();
+    let firstFrameMs = 0;
+    let resumePosition = p.position;
     let startup: ReturnType<typeof setTimeout>;
     const fail = (message: string) => {
-      if (failed) return;
+      if (failed || disposed) return;
       failed = true;
+      write();
       latest.current.onError(message);
     };
     const write = () => {
@@ -105,7 +117,7 @@ export function Player(p: Props) {
       };
     }
     const metadata = () => {
-      v.currentTime = p.position;
+      if (resumePosition > 0) v.currentTime = resumePosition;
       setDuration(v.duration);
       v.play().catch(() => setStatus("Press Play to start"));
     };
@@ -117,16 +129,51 @@ export function Player(p: Props) {
       }
     };
     const canPlay = () => {
+      if (!firstFrameMs) firstFrameMs = performance.now() - startedAt;
+      if (stalledAt) {
+        stalledMs += performance.now() - stalledAt;
+        stalledAt = 0;
+      }
       ready = true;
       setLoaded(true);
       clearTimeout(startup);
       setStatus("");
     };
     const error = () => fail("This source could not be played.");
+    const waiting = () => {
+      if (ready && !v.paused && !v.seeking && !stalledAt) {
+        stalls++;
+        stalledAt = performance.now();
+        setStatus("Buffering…");
+      }
+    };
+    const statsTimer = window.setInterval(() => {
+      if (stalledAt && (v.paused || v.seeking)) {
+        stalledMs += performance.now() - stalledAt;
+        stalledAt = 0;
+      }
+      if (stalledAt && performance.now() - stalledAt > 30000)
+        fail("Playback stalled for 30 seconds.");
+      let ahead = 0;
+      for (let i = 0; i < v.buffered.length; i++) {
+        if (
+          v.buffered.start(i) <= v.currentTime &&
+          v.buffered.end(i) >= v.currentTime
+        )
+          ahead = v.buffered.end(i) - v.currentTime;
+      }
+      const dropped = v.getVideoPlaybackQuality?.().droppedVideoFrames ?? 0;
+      const seconds =
+        (stalledMs + (stalledAt ? performance.now() - stalledAt : 0)) / 1000;
+      setDiagnostics(
+        `${hls ? "HLS.js" : "Native video"} · ${ahead.toFixed(1)} s buffered · ${stalls} stalls (${seconds.toFixed(1)} s) · ${dropped} dropped frames · startup ${(firstFrameMs / 1000).toFixed(1)} s`,
+      );
+    }, 1000);
     v.addEventListener("loadedmetadata", metadata);
     v.addEventListener("timeupdate", time);
     v.addEventListener("playing", canPlay);
     v.addEventListener("error", error);
+    v.addEventListener("waiting", waiting);
     if (
       /\.m3u8(?:\?|$)/i.test(p.url) &&
       !v.canPlayType("application/vnd.apple.mpegurl")
@@ -152,7 +199,19 @@ export function Player(p: Props) {
           hls.on(Hls.Events.MANIFEST_PARSED, () => setFloor(0.75));
           hls.on(Hls.Events.FRAG_LOADED, () => setFloor(0.9));
           hls.on(Hls.Events.ERROR, (_, data) => {
-            if (data.fatal) fail("The HLS source failed.");
+            if (!data.fatal || disposed || failed) return;
+            const next = recovery(data.type);
+            if (next.action === "network") {
+              clearTimeout(recoveryTimer);
+              setStatus("Reconnecting…");
+              recoveryTimer = setTimeout(() => {
+                if (!disposed && !failed)
+                  hls?.startLoad(v.currentTime || p.position);
+              }, next.delay);
+            } else if (next.action === "media") {
+              resumePosition = v.currentTime || p.position;
+              hls?.recoverMediaError();
+            } else fail("The HLS source failed after recovery attempts.");
           });
         })
         .catch(() => fail("The HLS player could not be loaded."));
@@ -172,14 +231,20 @@ export function Player(p: Props) {
       disposed = true;
       write();
       clearTimeout(startup);
+      clearTimeout(recoveryTimer);
+      clearInterval(statsTimer);
       hls?.destroy();
       v.removeEventListener("loadedmetadata", metadata);
       v.removeEventListener("timeupdate", time);
       v.removeEventListener("playing", canPlay);
       v.removeEventListener("error", error);
+      v.removeEventListener("waiting", waiting);
       v.pause();
       v.removeAttribute("src");
       v.load();
+      const destroyUrl = torrentHlsDestroyUrl(p.url, p.source.infoHash);
+      if (destroyUrl)
+        void fetch(destroyUrl, { keepalive: true }).catch(() => {});
     };
   }, [p.url]);
   useEffect(() => {
@@ -328,6 +393,7 @@ export function Player(p: Props) {
               </select>
             </label>
             <button onClick={p.onSources}>Change source</button>
+            <p aria-label="Playback diagnostics">{diagnostics}</p>
             <p>
               Preferred audio: {p.settings.audio.toUpperCase()}. Available
               tracks depend on the source.

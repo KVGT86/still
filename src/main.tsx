@@ -215,6 +215,7 @@ function App() {
       videoId: string;
       source: Stream;
       url: string;
+      fallbackUrl?: string;
       tracks: any[];
       auto: Stream[];
       all: Stream[];
@@ -225,6 +226,8 @@ function App() {
     >(null),
     [target, setTarget] = useState<Profile | null>(null);
   const requestId = useRef(0);
+  const sourceRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => sourceRequest.current?.abort(), []);
   useEffect(() => {
     const highlight = (event: PointerEvent) => {
       const element = (event.target as Element)?.closest<HTMLElement>(
@@ -252,7 +255,8 @@ function App() {
       const control = (event.target as Element)?.closest(
         "button,a[href],input[type=checkbox]",
       );
-      if (control && !control.closest(".player")) playInterfaceSound("activate");
+      if (control && !control.closest(".player"))
+        playInterfaceSound("activate");
     };
     document.addEventListener("click", activate);
     return () => document.removeEventListener("click", activate);
@@ -431,7 +435,11 @@ function App() {
         block: "nearest",
         inline: "nearest",
       });
-      if (target && !target.closest(".player") && data.settings.interfaceSounds) {
+      if (
+        target &&
+        !target.closest(".player") &&
+        data.settings.interfaceSounds
+      ) {
         playInterfaceSound("move");
       }
     };
@@ -530,6 +538,9 @@ function App() {
   }
   async function launch(meta: Meta, videoId: string) {
     const id = ++requestId.current;
+    sourceRequest.current?.abort();
+    const controller = new AbortController();
+    sourceRequest.current = controller;
     change((s) => {
       const old = s.progress[videoId];
       return old && (old.completed || old.hidden)
@@ -554,7 +565,7 @@ function App() {
     setError("");
     const list = demo
       ? [demoSource]
-      : await api.streams(addons, meta.type, videoId);
+      : await api.streams(addons, meta.type, videoId, controller.signal);
     if (id !== requestId.current) return;
     setResolving(false);
     const matching = rankSources(list, data.settings.audio, quality);
@@ -595,10 +606,24 @@ function App() {
             ]),
       ]);
       const tracks = [...(source.subtitles || []), ...extra];
+      const fallbackUrl =
+        source.infoHash && "webOSSystem" in window
+          ? await api.resolvePlayUrl(source, streamingServer, true)
+          : undefined;
       if (id !== requestId.current) return;
       setResolving(false);
       setSources(null);
-      setPlay({ meta, videoId, source, url, tracks, auto, all, failed });
+      setPlay({
+        meta,
+        videoId,
+        source,
+        url,
+        fallbackUrl,
+        tracks,
+        auto,
+        all,
+        failed,
+      });
     } catch (e) {
       if (id !== requestId.current) return;
       setResolving(false);
@@ -624,12 +649,18 @@ function App() {
     }
   }
   function cancelLoad() {
+    sourceRequest.current?.abort();
     requestId.current++;
     setResolving(false);
   }
   function failed(reason: string) {
     if (!play) return;
     const p = play;
+    if (p.fallbackUrl) {
+      setPlay({ ...p, url: p.fallbackUrl, fallbackUrl: undefined });
+      setError("Trying compatibility playback…");
+      return;
+    }
     setPlay(null);
     setError(`${reason} ${p.auto.length ? "Trying another source…" : ""}`);
     if (p.auto.length)
@@ -989,7 +1020,7 @@ function App() {
                             page === "Saved"
                               ? "Save a movie or series from its details to keep it here."
                               : page === "Search"
-                                ? "Search the catalogs from your configured addons."
+                                ? "Search the catalogues from your configured addons."
                                 : "No results available from your configured addons."
                           }
                         />
@@ -1476,18 +1507,10 @@ function App() {
 }
 function Brand() {
   return (
-    <div className="brand" role="img" aria-label="Still. Built by Rewa.">
+    <div className="brand" role="img" aria-label="Still.">
       <img className="brand-icon" src={appIcon} alt="" width="38" height="38" />
-      <span className="brand-lockup">
-        <span className="brand-name">
-          still<span className="brand-dot">.</span>
-        </span>
-        <span className="brand-maker">
-          <span>by</span>
-          <span className="rewa-mark">
-            Rewa<span className="rewa-dot">.</span>
-          </span>
-        </span>
+      <span>
+        still<span className="brand-dot">.</span>
       </span>
     </div>
   );
@@ -1912,7 +1935,7 @@ function Settings(p: any) {
       <p className="fine-print">
         Still 0.2.4 · An independent Stremio client.
         <br />
-        Configured addons supply catalogs and sources. No content is hosted by
+        Configured addons supply catalogues and sources. No content is hosted by
         Still.
       </p>
     </div>

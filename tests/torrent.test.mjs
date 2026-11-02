@@ -1,7 +1,29 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { torrentUrl, torrentHlsUrl } from "../shared/torrent.mjs";
+import {
+  torrentUrl,
+  torrentHlsUrl,
+  torrentHlsDestroyUrl,
+} from "../shared/torrent.mjs";
 const hash = "0123456789abcdef0123456789abcdef01234567";
+test("cleanup targets only the matching generated HLS session", () => {
+  const media = torrentUrl({ infoHash: hash }, "http://localhost:1234");
+  const url = torrentHlsUrl(
+    media,
+    "http://localhost:1234",
+    "12345678-1234-1234-1234-123456789012",
+  );
+  assert.equal(
+    torrentHlsDestroyUrl(url, hash),
+    "http://localhost:1234/hlsv2/12345678-1234-1234-1234-123456789012/destroy",
+  );
+  assert.equal(torrentHlsDestroyUrl(url, "1".repeat(40)), null);
+  assert.equal(torrentHlsDestroyUrl(media, hash), null);
+  assert.equal(
+    torrentHlsDestroyUrl("https://other.test/master.m3u8", hash),
+    null,
+  );
+});
 test("torrent URLs preserve explicit index zero, trackers and filename selectors", () => {
   const url = new URL(
     torrentUrl(

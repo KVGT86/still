@@ -5,13 +5,25 @@ import { torrentUrl, torrentHlsUrl } from "../shared/torrent.mjs";
 let catalogAuth = "";
 let addonCache: Addon[] = [];
 const metaCache = new Map<string, Meta>();
-export async function json(url: string, init: RequestInit = {}) {
-  const response = await fetch(url, {
-    ...init,
-    signal: init.signal || AbortSignal.timeout(15000),
-  });
-  if (!response.ok) throw new Error(`Connection failed (${response.status})`);
-  return response.json();
+export async function json(
+  url: string,
+  init: RequestInit = {},
+  timeout = 15000,
+) {
+  // webOS 22's Chromium predates AbortSignal.timeout/any.
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (init.signal?.aborted) cancel();
+  init.signal?.addEventListener("abort", cancel, { once: true });
+  const timer = setTimeout(cancel, timeout);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    if (!response.ok) throw new Error(`Connection failed (${response.status})`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener("abort", cancel);
+  }
 }
 export async function stremio(method: string, body: Record<string, unknown>) {
   const data = await json(`https://api.strem.io/api/${method}`, {
@@ -71,14 +83,16 @@ export async function resource(
   id: string,
   extra = "",
   timeout = 0,
+  signal?: AbortSignal,
 ) {
   const url = addon.transportUrl.replace(/\/manifest\.json(?:\?.*)?$/, "");
   return json(
     `${url}/${name}/${encodeURIComponent(type)}/${encodeURIComponent(id)}${extra ? "/" + extra : ""}.json`,
-    timeout ? { signal: AbortSignal.timeout(timeout) } : {},
+    { signal },
+    timeout || 15000,
   );
 }
-// One slow add-on must not hold up playback; catalogs and details keep the longer default.
+// One slow add-on must not hold up playback; catalogues and details keep the longer default.
 const FAST_ADDON_MS = 5000;
 function supports(addon: Addon, name: string, type: string, id = "") {
   return (addon.manifest.resources || []).some((r) =>
@@ -140,11 +154,12 @@ export async function streams(
   addons: Addon[],
   type: string,
   id: string,
+  signal?: AbortSignal,
 ): Promise<Stream[]> {
   const results = await Promise.allSettled(
     addons
       .filter((a) => supports(a, "stream", type, id))
-      .map((a) => resource(a, "stream", type, id, "", FAST_ADDON_MS)),
+      .map((a) => resource(a, "stream", type, id, "", FAST_ADDON_MS, signal)),
   );
   return results.flatMap((r, a) =>
     r.status === "fulfilled"
@@ -364,8 +379,16 @@ export function playUrl(stream: Stream, server: string) {
     );
   return stream.url;
 }
-export async function resolvePlayUrl(stream: Stream, server: string) {
-  if (stream.infoHash && !window.StillNative) {
+export async function resolvePlayUrl(
+  stream: Stream,
+  server: string,
+  compatibility = false,
+) {
+  if (
+    stream.infoHash &&
+    !window.StillNative &&
+    (!("webOSSystem" in window) || compatibility)
+  ) {
     const base = server.trim()
       ? safeBase(server.trim())
       : await window.StillDesktop?.engineURL();

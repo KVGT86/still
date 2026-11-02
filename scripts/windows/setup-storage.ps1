@@ -20,7 +20,7 @@ if (-not $image.Attached) { $image = Mount-DiskImage -ImagePath $imagePath -NoDr
 $disk = $image | Get-Disk
 if ($disk.Size -gt 9GB -or $disk.Size -lt 7GB) { throw 'Unexpected virtual disk size. No disk will be formatted.' }
 if ($disk.PartitionStyle -eq 'RAW') {
-    if (-not $created) { throw 'Existing image is uninitialized. Refusing to format existing storage.' }
+    if (-not $created) { throw 'Existing image is uninitialised. Refusing to format existing storage.' }
     $disk | Initialize-Disk -PartitionStyle GPT -PassThru | Out-Null
     $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize
     $partition | Format-Volume -FileSystem NTFS -NewFileSystemLabel 'Still' -Confirm:$false | Out-Null

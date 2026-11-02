@@ -13,7 +13,9 @@ import android.widget.*;
 import androidx.media3.common.*;
 import androidx.media3.datasource.*;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter;
 import androidx.media3.ui.PlayerView;
 import java.util.*;
 import org.json.JSONArray;
@@ -36,6 +38,11 @@ public class PlaybackActivity extends Activity {
     private float progress = 0.5f;
     private final Handler handler = new Handler();
     private int ticks;
+    private long playbackStartedAt, firstFrameMs, stallStartedAt, stalledMs;
+    private int stallCount;
+    private int networkRecoveries;
+    private boolean resumeAfterPause;
+    private DefaultBandwidthMeter bandwidth;
     private final Runnable hide = () -> { if (player != null && player.isPlaying()) { top.setVisibility(View.INVISIBLE); bottom.setVisibility(View.INVISIBLE); } };
     private final Runnable report = new Runnable() {
         public void run() {
@@ -56,13 +63,37 @@ public class PlaybackActivity extends Activity {
             Map<String, String> requestHeaders = new HashMap<>(); JSONObject headers = payload.optJSONObject("headers");
             if (headers != null) for (Iterator<String> keys = headers.keys(); keys.hasNext();) { String key = keys.next(); requestHeaders.put(key, headers.getString(key)); }
             DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory().setDefaultRequestProperties(requestHeaders).setAllowCrossProtocolRedirects(true).setConnectTimeoutMs(60000).setReadTimeoutMs(60000); // the engine holds a request open while it finds torrent peers
-            player = new ExoPlayer.Builder(this).setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http))).build();
+            // A larger in-memory reserve absorbs brief peer/network stalls without disk caching.
+            DefaultLoadControl buffering = new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(50000, 90000, 3000, 8000)
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .build();
+            bandwidth = DefaultBandwidthMeter.getSingletonInstance(this);
+            DefaultDataSource.Factory data = new DefaultDataSource.Factory(this, http).setTransferListener(bandwidth);
+            player = new ExoPlayer.Builder(this).setLoadControl(buffering).setBandwidthMeter(bandwidth).setMediaSourceFactory(new DefaultMediaSourceFactory(data)).build();
             player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setPreferredAudioLanguage(payload.optString("audio", "en")).setPreferredTextLanguage(payload.optString("subtitle", "en")).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !payload.optBoolean("subtitles", true)).build());
             buildControls(payload);
+            playbackStartedAt = android.os.SystemClock.elapsedRealtime();
             player.addListener(new Player.Listener() {
-                @Override public void onPlayerError(PlaybackException exception) { error = "This source could not be played."; finish(); }
+                @Override public void onRenderedFirstFrame() { if (firstFrameMs == 0) firstFrameMs = android.os.SystemClock.elapsedRealtime() - playbackStartedAt; }
+                @Override public void onPlayerError(PlaybackException exception) {
+                    boolean transientNetwork = exception.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+                        || exception.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT;
+                    if (transientNetwork && networkRecoveries < 2) {
+                        handler.postDelayed(() -> { if (!finished && player != null) player.prepare(); }, ++networkRecoveries * 1000L);
+                        return;
+                    }
+                    error = "This source could not be played."; finish();
+                }
                 @Override public void onIsPlayingChanged(boolean playing) { if (playing) reveal(); }
-                @Override public void onPlaybackStateChanged(int state) { spinner.setVisibility(state == Player.STATE_READY || state == Player.STATE_ENDED ? View.GONE : View.VISIBLE); if (state == Player.STATE_READY) { ready = true; finishLoader(); } if (state == Player.STATE_ENDED) { ended = true; finish(); } }
+                @Override public void onPlaybackStateChanged(int state) {
+                    long now = android.os.SystemClock.elapsedRealtime();
+                    if (state == Player.STATE_BUFFERING && ready && player.getPlayWhenReady() && !seeking && stallStartedAt == 0) { stallCount++; stallStartedAt = now; }
+                    if (state != Player.STATE_BUFFERING && stallStartedAt != 0) { stalledMs += now - stallStartedAt; stallStartedAt = 0; }
+                    spinner.setVisibility(state == Player.STATE_READY || state == Player.STATE_ENDED ? View.GONE : View.VISIBLE);
+                    if (state == Player.STATE_READY) { ready = true; finishLoader(); }
+                    if (state == Player.STATE_ENDED) { ended = true; finish(); }
+                }
             });
             List<MediaItem.SubtitleConfiguration> subtitles = new ArrayList<>(); JSONArray tracks = payload.optJSONArray("tracks");
             if (tracks != null) for (int i = 0; i < tracks.length(); i++) {
@@ -83,7 +114,7 @@ public class PlaybackActivity extends Activity {
         top.addView(title, new LinearLayout.LayoutParams(0, -2, 1)); top.addView(button("•••", () -> options())); root.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
         bottom = new LinearLayout(this); bottom.setOrientation(LinearLayout.VERTICAL); bottom.setPadding(32, 10, 32, 20); bottom.setBackgroundColor(0xbb000000);
         timeline = new SeekBar(this); timeline.setMax(1000); timeline.setContentDescription("Playback position"); bottom.addView(timeline);
-        timeline.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() { public void onStartTrackingTouch(SeekBar bar) { seeking = true; } public void onStopTrackingTouch(SeekBar bar) { seeking = false; reveal(); } public void onProgressChanged(SeekBar bar, int value, boolean user) { if (user && player.getDuration() > 0) player.seekTo(player.getDuration() * value / 1000); } });
+        timeline.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() { public void onStartTrackingTouch(SeekBar bar) { seeking = true; } public void onStopTrackingTouch(SeekBar bar) { seeking = false; if (player.getDuration() > 0) player.seekTo(player.getDuration() * bar.getProgress() / 1000); reveal(); } public void onProgressChanged(SeekBar bar, int value, boolean user) { if (user && !seeking && player.getDuration() > 0) player.seekTo(player.getDuration() * value / 1000); } });
         LinearLayout transport = row(); time = new TextView(this); time.setTextColor(Color.WHITE); time.setTextSize(14); transport.addView(time, new LinearLayout.LayoutParams(0, -2, 1));
         pause = button("Ⅱ", () -> { if (player.isPlaying()) player.pause(); else player.play(); }); pause.setContentDescription("Play or pause"); transport.addView(pause);
         transport.addView(button("Audio & subtitles", () -> new AlertDialog.Builder(this).setItems(new String[]{"Audio language", "Subtitles"}, (d, which) -> chooseTrack(which == 0 ? C.TRACK_TYPE_AUDIO : C.TRACK_TYPE_TEXT)).show()));
@@ -91,13 +122,27 @@ public class PlaybackActivity extends Activity {
         bottom.addView(transport); root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM)); buildLoader(root, payload); root.setOnClickListener(v -> reveal()); setContentView(root); pause.requestFocus(); reveal();
     }
     private LinearLayout row() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.HORIZONTAL); view.setGravity(Gravity.CENTER_VERTICAL); return view; }
+    private void showStatistics() {
+        Format video = player.getVideoFormat();
+        androidx.media3.exoplayer.DecoderCounters counters = player.getVideoDecoderCounters();
+        if (counters != null) counters.ensureUpdated();
+        long stallTime = stalledMs + (stallStartedAt == 0 ? 0 : android.os.SystemClock.elapsedRealtime() - stallStartedAt);
+        String message = String.format(Locale.UK,
+            "Buffered: %.1f s\nNetwork estimate: %.1f Mbps\nStartup: %.1f s\nBuffering: %d events, %.1f s\nDropped frames: %d\nVideo: %s",
+            player.getTotalBufferedDuration() / 1000.0,
+            bandwidth == null ? 0 : bandwidth.getBitrateEstimate() / 1000000.0,
+            firstFrameMs / 1000.0, stallCount, stallTime / 1000.0,
+            counters == null ? 0 : counters.droppedBufferCount,
+            video == null ? "Unknown" : video.sampleMimeType + " " + video.width + "×" + video.height);
+        new AlertDialog.Builder(this).setTitle("Playback statistics").setMessage(message).setPositiveButton("Close", null).show();
+    }
     private Button button(String label, Runnable action) {
         Button button = new Button(this); button.setText(label); button.setAllCaps(false); button.setTextColor(Color.WHITE); button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0x333b4f40));
         button.setOnClickListener(v -> { action.run(); reveal(); }); button.setOnFocusChangeListener((v, focused) -> { button.setTextColor(focused ? 0xff1f2c22 : Color.WHITE); button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(focused ? 0xffedf1e6 : 0x333b4f40)); if (focused) reveal(); }); return button;
     }
     private void reveal() { if (top == null || bottom == null) return; top.setVisibility(View.VISIBLE); bottom.setVisibility(View.VISIBLE); handler.removeCallbacks(hide); handler.postDelayed(hide, 5000); }
     @Override public boolean dispatchKeyEvent(android.view.KeyEvent event) { if (event.getKeyCode() != android.view.KeyEvent.KEYCODE_BACK) reveal(); return super.dispatchKeyEvent(event); }
-    private void options() { new AlertDialog.Builder(this).setTitle("Playback").setItems(new String[]{"Change source", "Playback speed"}, (d, which) -> { if (which == 0) { showSources = true; finish(); } else new AlertDialog.Builder(this).setItems(new String[]{"0.75×", "1×", "1.25×", "1.5×", "2×"}, (dialog, index) -> player.setPlaybackSpeed(new float[]{.75f, 1f, 1.25f, 1.5f, 2f}[index])).show(); }).show(); }
+    private void options() { new AlertDialog.Builder(this).setTitle("Playback").setItems(new String[]{"Change source", "Playback speed", "Playback statistics"}, (d, which) -> { if (which == 0) { showSources = true; finish(); } else if (which == 1) new AlertDialog.Builder(this).setItems(new String[]{"0.75×", "1×", "1.25×", "1.5×", "2×"}, (dialog, index) -> player.setPlaybackSpeed(new float[]{.75f, 1f, 1.25f, 1.5f, 2f}[index])).show(); else showStatistics(); }).show(); }
     private void chooseTrack(int type) {
         List<String> labels = new ArrayList<>(); List<TrackSelectionOverride> overrides = new ArrayList<>(); labels.add(type == C.TRACK_TYPE_TEXT ? "Off" : "Automatic"); overrides.add(null);
         for (Tracks.Group group : player.getCurrentTracks().getGroups()) if (group.getType() == type) for (int i = 0; i < group.length; i++) if (group.isTrackSupported(i)) { Format format = group.getTrackFormat(i); labels.add(format.label != null ? format.label : format.language != null ? format.language : "Track " + (i + 1)); overrides.add(new TrackSelectionOverride(group.getMediaTrackGroup(), i)); }
@@ -136,7 +181,8 @@ public class PlaybackActivity extends Activity {
         loader.animate().alpha(0f).setStartDelay(350).setDuration(500).withEndAction(() -> loader.setVisibility(View.GONE)).start();
     }
     private String stamp(double seconds) { return String.format(Locale.ROOT, "%d:%02d", (int) seconds / 60, (int) seconds % 60); }
-    @Override protected void onPause() { super.onPause(); if (player != null) player.pause(); }
+    @Override protected void onPause() { super.onPause(); if (player != null) { resumeAfterPause = player.getPlayWhenReady(); player.pause(); } }
+    @Override protected void onResume() { super.onResume(); if (player != null && resumeAfterPause && !finished) { resumeAfterPause = false; player.play(); } }
     @Override public void finish() {
         if (finished) return; finished = true; Intent result = new Intent();
         if (player != null) { result.putExtra("position", player.getCurrentPosition() / 1000.0); result.putExtra("duration", Math.max(0, player.getDuration()) / 1000.0); }

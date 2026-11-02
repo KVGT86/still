@@ -163,6 +163,10 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     });
     assert.equal(hls.status, 200);
     assert.match(await hls.text(), /#EXTM3U/);
+    const destroyed = await fetch(`${base}/hlsv2/fixture/destroy`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    assert.equal(destroyed.status, 200);
     const session = engine.session;
     await engine.stop();
     await assert.rejects(readFile(join(session, "server-settings.json")));

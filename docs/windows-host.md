@@ -6,7 +6,7 @@ Requires administrator PowerShell, Node 22.16 or newer, an existing Stremio inst
 
 ## Storage
 
-`scripts/windows/setup-storage.ps1` creates a new expanding 8 GiB VHDX at `E:\Still\still.vhdx` and mounts it at `E:\Still\Volume`. Only that new virtual disk is initialized. The E: drive is never formatted. Existing uninitialized disk images are not automatically reformatted.
+`scripts/windows/setup-storage.ps1` creates a new expanding 8 GiB VHDX at `E:\Still\still.vhdx` and mounts it at `E:\Still\Volume`. Only that new virtual disk is initialised. The E: drive is never formatted. Existing uninitialised disk images are not automatically reformatted.
 
 The volume contains App, Data, Backups, Packages, Temp and Runtime directories. Persistent profile state lives in `Data\still.sqlite`; media cleanup only removes Runtime. The database has a 256 MiB page limit, full synchronous commits and a bounded retained journal. Online backups refresh hourly and retain seven daily snapshots. Backups are checkpointed into single-file SQLite snapshots before rotation.
 
@@ -39,9 +39,9 @@ The setup installs a SYSTEM scheduled task named **StillHost**, triggered at boo
 
 Existing Tailscale Serve listeners are preserved. Setup refuses to replace a conflicting proxy on either chosen port.
 
-For explicitly authorized access by a webOS TV on the same trusted home network, run `setup-host.ps1 -EnableLan`. It adds reverse proxies bound to the PC's specific LAN IPv4 address on 8787 and 11470, plus Windows Firewall rules scoped to that address, the Node executable and LocalSubnet. It does not bind a wildcard address or change existing Tailscale proxies. Reserve the PC's LAN address in DHCP. LAN access is opt-in and remains recorded in the host configuration for subsequent starts.
+For explicitly authorised access by a webOS TV on the same trusted home network, run `setup-host.ps1 -EnableLan`. It adds reverse proxies bound to the PC's specific LAN IPv4 address on 8787 and 11470, plus Windows Firewall rules scoped to that address, the Node executable and LocalSubnet. It does not bind a wildcard address or change existing Tailscale proxies. Reserve the PC's LAN address in DHCP. LAN access is opt-in and remains recorded in the host configuration for subsequent starts.
 
-Connect each signed-in Still client to the profile service, then select the same profile to synchronize Saved titles and progress. Set its streaming-server address to the engine endpoint. Android uses its native player; browser, Linux and LG clients can use the server's HLS conversion. Android/Google TV and tablets can run Tailscale themselves. LG webOS can use the opt-in LAN endpoints when on the same network; otherwise it needs a tailnet-capable gateway.
+Connect each signed-in Still client to the profile service, then select the same profile to synchronise Saved titles and progress. Set its streaming-server address to the engine endpoint. Android uses its native player; browser, Linux and LG clients can use the server's HLS conversion. Android/Google TV and tablets can run Tailscale themselves. LG webOS can use the opt-in LAN endpoints when on the same network; otherwise it needs a tailnet-capable gateway.
 
 ## Check and restart
 

@@ -2,7 +2,7 @@
 
 ## Product statement
 
-An uncluttered, Apple-influenced Stremio client for a personal device ecosystem. It provides a light-first interface, built-in playback, optional synchronized household profiles, and installable sideload packages for LG webOS, Android/Google TV, and Android tablets.
+An uncluttered, Apple-influenced Stremio client for a personal device ecosystem. It provides a light-first interface, built-in playback, optional synchronised household profiles, and installable sideload packages for LG webOS, Android/Google TV, and Android tablets.
 
 The client consumes a Stremio account and its already-configured addons. Addon installation and configuration remain in the standard Stremio web tool.
 
@@ -31,9 +31,9 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 ## External dependencies
 
 - Stremio owns account authentication and addon configuration.
-- Configured addons supply catalogs, metadata, sources, and availability data where available.
-- The self-hosted companion service owns multi-profile synchronization and recommendation state.
-- The service is reachable through a user-provided Tailscale address. Tailnet membership is sufficient client authorization.
+- Configured addons supply catalogues, metadata, sources, and availability data where available.
+- The self-hosted companion service owns multi-profile synchronisation and recommendation state.
+- The service is reachable through a user-provided Tailscale address. Tailnet membership is sufficient client authorisation.
 
 ## Operating modes
 
@@ -57,7 +57,7 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 - Each profile has a name and avatar.
 - PIN protection is optional per profile.
 - Any user may create, rename, PIN-protect, or delete profiles.
-- Profile deletion requires explicit confirmation and removes that profile's synchronized data.
+- Profile deletion requires explicit confirmation and removes that profile's synchronised data.
 - Profiles do not provide child or content-restriction modes.
 
 ## Information architecture
@@ -85,9 +85,9 @@ Saved is one profile-specific collection. There is no Watchlist/Favourites split
 
 ## Recommendations
 
-- Recommended ranks titles available through the configured addon catalogs.
-- A new profile begins with popular or trending catalog titles.
-- Personalization gradually uses viewing history, completion, and explicit feedback.
+- Recommended ranks titles available through the configured addon catalogues.
+- A new profile begins with popular or trending catalogue titles.
+- Personalisation gradually uses viewing history, completion, and explicit feedback.
 - Profiles may mark a title More Like This, Not Interested, or Already Watched.
 - Not Interested excludes that title from future recommendations.
 - Already Watched affects future ranking without recommending the same title again.
@@ -123,15 +123,15 @@ Individual addon failures are silent when other addons return usable results. If
 - Autoplay has three modes: On, Off, and Scheduled.
 - On and Off override the schedule.
 
-## Synchronization and resilience
+## Synchronisation and resilience
 
 - Intentional offline operation is not supported.
 - Brief companion-service interruptions must not block browsing or playback when cached profile data is available.
-- Changes made during a brief interruption are queued and synchronized when the service becomes reachable again.
+- Changes made during a brief interruption are queued and synchronised when the service becomes reachable again.
 - Multi-device offline conflict resolution is outside scope because the product assumes connectivity.
 - Expired Stremio authentication prompts reauthentication without deleting local or companion-service profile data.
 
-## Platform and input behavior
+## Platform and input behaviour
 
 - All supported layouts are landscape-only.
 - Android/Google TV uses directional remote navigation.
@@ -140,18 +140,18 @@ Individual addon failures are silent when other addons return usable results. If
 - Every actionable television element has an unambiguous visible focus state.
 - Both themes maintain readable contrast; broader system accessibility adaptation is not a v1 requirement.
 
-## Theme behavior
+## Theme behaviour
 
 - Light is the default theme.
 - A neutral dark theme is also available.
 - Purple is not part of the product identity.
-- The selected theme persists per profile. Household profiles synchronize it through the profile service; the single profile keeps it on each device.
+- The selected theme persists per profile. Household profiles synchronise it through the profile service; the single profile keeps it on each device.
 
 ## Acceptance scenarios
 
 ### Resume an episode
 
-A user launches the app, chooses a profile, lands on Continue Watching, resumes an episode from its synchronized position, and sees the next unwatched episode replace it after reaching 95%.
+A user launches the app, chooses a profile, lands on Continue Watching, resumes an episode from its synchronised position, and sees the next unwatched episode replace it after reaching 95%.
 
 ### Automatic source success
 
@@ -167,7 +167,7 @@ At 21:59 in Scheduled mode, the next episode may autoplay. At 22:00 or later it 
 
 ### Multi-profile isolation
 
-Two profiles use the same Stremio account and addon configuration. Their Saved collections, progress, history, preferences, feedback, and recommendations remain independent and synchronize across authorized tailnet clients.
+Two profiles use the same Stremio account and addon configuration. Their Saved collections, progress, history, preferences, feedback, and recommendations remain independent and synchronise across authorised tailnet clients.
 
 ## Deliberately flexible implementation decisions
 

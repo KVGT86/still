@@ -22,3 +22,22 @@ export function torrentHlsUrl(mediaURL, base, id) {
   url.searchParams.set("maxAudioChannels", "2");
   return url.href;
 }
+
+export function torrentHlsDestroyUrl(value, hash) {
+  try {
+    const url = new URL(value);
+    const media = new URL(url.searchParams.get("mediaURL"));
+    if (
+      !/^[a-f0-9]{40}$/i.test(hash || "") ||
+      media.origin !== url.origin ||
+      !media.pathname.toLowerCase().includes(`/${hash.toLowerCase()}/`) ||
+      !/\/hlsv2\/[a-f0-9-]{36}\/master\.m3u8$/i.test(url.pathname)
+    )
+      return null;
+    url.pathname = url.pathname.replace(/master\.m3u8$/, "destroy");
+    url.search = "";
+    return url.href;
+  } catch {
+    return null;
+  }
+}

@@ -13,7 +13,7 @@
 - Persistent SQLite Saved/progress across a service restart, backup restoration and seven-file retention on both Linux and the deployed Windows host.
 - Windows deployment reusing Stremio 4.21.0's installed engine, with Node 24.14.1, an expanding 8 GiB E: volume, a temporary 2 GiB engine cache cleared on restart and startup via Task Scheduler.
 - Windows torrent range requests and HTTPS HLS with H.264 video and AC3-to-AAC conversion. Service task restart leaves no old child processes and restores both services.
-- Private Tailscale HTTPS profile/engine endpoints and explicitly enabled LAN access bound to one address with LocalSubnet firewall scope. LAN profile health was checked from another device. Proxy tests verify authorization, CORS and range preservation.
+- Private Tailscale HTTPS profile/engine endpoints and explicitly enabled LAN access bound to one address with LocalSubnet firewall scope. LAN profile health was checked from another device. Proxy tests verify authorisation, CORS and range preservation.
 - `npm audit` for the main application has no known advisories at the time of the build. The isolated LG development CLI retains upstream advisories and is not shipped with the application or service.
 
 ## Needs real-device verification
@@ -28,8 +28,8 @@ On each device:
 2. Link the real Stremio account, select a profile, and confirm existing Saved titles and progress import correctly.
 3. Check directional focus and Back; on LG also check Magic Remote pointer targeting.
 4. Confirm detected maximum quality and reduce it if a codec/display combination needs it.
-5. Play an authorized HTTP source; test alternate audio, subtitles, resume, source fallback, and next episode.
-6. For torrent-only sources, configure a reachable Stremio streaming server and test an authorized source.
+5. Play an authorised HTTP source; test alternate audio, subtitles, resume, source fallback, and next episode.
+6. For torrent-only sources, configure a reachable Stremio streaming server and test an authorised source.
 7. Connect the profile service using its HTTPS tailnet address, or the explicitly enabled local address for an LG on the same network.
 8. Check two separate profiles across devices, optional PINs, Saved isolation, and scheduled autoplay around 07:00/22:00.
 

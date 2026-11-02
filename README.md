@@ -3,9 +3,6 @@
 <p align="center">
   <img src="src/assets/app-icon.svg" alt="Still app icon" width="120">
 </p>
-<p align="center">
-  <sub>Built by <strong>Rewa.</strong></sub>
-</p>
 
 Still is a light-first, landscape Stremio client for Linux, Android TV, Google TV, Android tablets and LG webOS. It keeps Continue Watching prominent, removes most of the original interface clutter, and adds optional household profiles.
 
@@ -50,12 +47,12 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 ## What Still can do
 
 - Home containing a large latest item, five recent items, then earlier viewing history; Recommended, Search, Saved and Settings stay in the sidebar.
-- Stremio login and QR linking, existing addon catalogs, metadata, episodes, streams and subtitles.
+- Stremio login and QR linking, existing addon catalogues, metadata, episodes, streams and subtitles.
 - Automatic source selection with a device quality ceiling. Language never excludes a source; sources tagged with a different language are tried last. Unknown resolution is kept for manual selection. Sources with a healthy swarm come first, then the highest resolution within the ceiling, then reported peers/seeders; this is availability metadata, not telemetry gathered from other Still users.
 - Automatic fallback through matching sources, then a complete manual list with failures marked.
 - Profile preferences for audio, optional subtitles and autoplay: on, off, or 07:00–22:00 device local time.
 - Continue Watching begins at 2%; completion at 95% queues the next released unwatched episode. Manual removal does not mark watched.
-- One Saved collection and feedback-driven catalog ranking: More Like This, Not Interested, Already Watched. This is a deterministic genre-affinity recommendation model and requires no paid AI service.
+- One Saved collection and feedback-driven catalogue ranking: More Like This, Not Interested, Already Watched. This is a deterministic genre-affinity recommendation model and requires no paid AI service.
 - Per-profile light and neutral dark themes, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
 - Android's built-in Media3 player; browser/webOS HTML video with HLS fallback.
 
@@ -111,7 +108,7 @@ Use this when one person uses the Stremio account.
 
 Saved titles and playback state use Stremio's library. Stremio's watched-episode bitfield is preserved when a series is updated. Theme, audio, subtitle, autoplay and recommendation-feedback settings remain local to the profile on that device. No companion database is required.
 
-### Path B: synchronized household profiles
+### Path B: synchronised household profiles
 
 Use this when several people share one Stremio account but need separate Saved lists and viewing history.
 
@@ -216,7 +213,7 @@ The launcher appears on both TV and tablet. Landscape is enforced. The bundled c
 
 ## LG webOS
 
-The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmware behavior needs testing on the real TV. Install LG's Developer Mode app, sign in, enable Developer Mode, and keep its session renewed before using the CLI.
+The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmware behaviour needs testing on the real TV. Install LG's Developer Mode app, sign in, enable Developer Mode, and keep its session renewed before using the CLI.
 
 ```sh
 npm ci
@@ -228,7 +225,7 @@ tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 
 Enable LG's Developer Mode app and configure its key first. Sideloads remain subject to LG Developer Mode session expiry/renewal rules. See the [LG CLI guide](https://webostv.developer.lge.com/develop/tools/cli-dev-guide).
 
-webOS uses a classic IIFE JavaScript bundle rather than ES module script tags, because packaged file-origin apps cannot safely rely on module loading. App resources are bundled; catalog artwork and media remain remote. The app supports standard directional keys and pointer events. Magic Remote hardware calibration must be verified on-device.
+webOS uses a classic IIFE JavaScript bundle rather than ES module script tags, because packaged file-origin apps cannot safely rely on module loading. App resources are bundled; catalogue artwork and media remain remote. The app supports standard directional keys and pointer events. Magic Remote hardware calibration must be verified on-device.
 
 LG's CLI is isolated in `tools/webos/` and installed automatically by the webOS packaging command. Its upstream dependency tree currently has security advisories; it is used only for local packaging/device operations and is never included in the application or companion-service image. Do not run its optional development servers on an untrusted network.
 
@@ -254,7 +251,7 @@ Read [SECURITY.md](SECURITY.md) before running a public fork. The intended deplo
 - An HTTPS-hosted client requires HTTPS media/server endpoints unless the platform permits mixed content. Prefer HTTPS tailnet service URLs.
 - Resolution detection reflects the current display mode, not a guarantee about every codec/HDR combination. Lower the per-device ceiling if required.
 - LG uses the native device video width rather than the app's graphics resolution; a 1080p app surface can therefore still select 4K video on a UHD television.
-- Actual account, addon, codec and remote-control behavior still requires testing on each physical device. Automated tests use reserved fixture accounts, domains and media.
+- Actual account, addon, codec and remote-control behaviour still requires testing on each physical device. Automated tests use reserved fixture accounts, domains and media.
 
 ## Security review status
 
