@@ -27,7 +27,7 @@ Still shares Stremio's account/addon and engine contracts, not its entire player
 
 ## Automated evidence
 
-- 20 Node tests and production TypeScript/Vite build passed.
+- 21 Node tests and production TypeScript/Vite build passed.
 - Eight browser checks passed, including the LG source-exhaustion journey: original media fails, one compatibility session is tried per source, then failures are marked. This simulates webOS detection in Chrome, not an LG decoder.
 - Real loopback BitTorrent integration passed: metadata/pieces, automatic file selection, byte-range seeking, HLS conversion, origin checks and engine-session cleanup.
 - Android debug APK and webOS IPK built. The APK was rebuilt after the Android retry/resume changes.

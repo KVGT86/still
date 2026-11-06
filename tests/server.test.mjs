@@ -75,9 +75,15 @@ test("service isolates accounts, protects PIN data, merges changes and confirms 
       meta: { id: "y", type: "movie", name: "Y" },
       updatedAt: Date.now(),
     };
-    assert.ok(
-      (await call(`/profiles/${p.id}/state`, state, a, u.token)).data.saved.y,
-    );
+    state.settings.theme = "scheduled";
+    state.settings.interfaceSounds = true;
+    state.settingsAt = Date.now();
+    const accepted = (
+      await call(`/profiles/${p.id}/state`, state, a, u.token)
+    ).data;
+    assert.ok(accepted.saved.y);
+    assert.equal(accepted.settings.theme, "scheduled");
+    assert.equal(accepted.settings.interfaceSounds, true);
     assert.equal(
       (await call(`/profiles/${p.id}/delete`, {}, a, u.token)).status,
       400,

@@ -294,7 +294,9 @@ function validState(state) {
     typeof state.settings.subtitle === "string" &&
     /^[a-z]{2,3}$/.test(state.settings.subtitle) &&
     (state.settings.theme === undefined ||
-      ["light", "dark"].includes(state.settings.theme)) &&
+      ["light", "dark", "scheduled"].includes(state.settings.theme)) &&
+    (state.settings.interfaceSounds === undefined ||
+      typeof state.settings.interfaceSounds === "boolean") &&
     typeof state.settings.subtitles === "boolean" &&
     ["on", "off", "scheduled"].includes(state.settings.autoplay) &&
     Number.isFinite(state.settingsAt) &&
