@@ -18,10 +18,17 @@ type Props = {
     subtitle: string;
     subtitles: boolean;
     autoplay: string;
+    audioPassthrough: boolean;
+    frameRateMatching: boolean;
+    autoSourceSwitch: boolean;
+    subtitleOffset: number;
+    maxBitrate: number;
   };
   tracks: { url: string; lang: string }[];
+  bufferTarget: number;
   onProgress: (p: number, d: number) => void;
   onError: (message: string) => void;
+  onHealth: (result: "success" | "stall") => void;
   onClose: () => void;
   onSources: () => void;
   onNext?: () => void;
@@ -90,6 +97,7 @@ export function Player(p: Props) {
       else latest.current.onClose();
     };
     window.stillPlaybackFailed = fail;
+    window.stillPlaybackHealth = (result) => latest.current.onHealth(result);
     window.stillNext = () => latest.current.onNext?.();
     window.stillShowSources = () => latest.current.onSources();
     if (window.StillNative) {
@@ -106,12 +114,19 @@ export function Player(p: Props) {
           tracks: p.tracks,
           hasNext: !!p.onNext,
           torrent: !!p.source.infoHash,
+          audioPassthrough: p.settings.audioPassthrough,
+          frameRateMatching: p.settings.frameRateMatching,
+          autoSourceSwitch: p.settings.autoSourceSwitch,
+          subtitleOffset: p.settings.subtitleOffset,
+          maxBitrate: p.settings.maxBitrate,
+          bufferTarget: p.bufferTarget,
         }),
       );
       return () => {
         delete window.stillProgress;
         delete window.stillPlaybackEnded;
         delete window.stillPlaybackFailed;
+        delete window.stillPlaybackHealth;
         delete window.stillNext;
         delete window.stillShowSources;
       };
@@ -129,12 +144,14 @@ export function Player(p: Props) {
       }
     };
     const canPlay = () => {
-      if (!firstFrameMs) firstFrameMs = performance.now() - startedAt;
+      const firstFrame = !firstFrameMs;
+      if (firstFrame) firstFrameMs = performance.now() - startedAt;
       if (stalledAt) {
         stalledMs += performance.now() - stalledAt;
         stalledAt = 0;
       }
       ready = true;
+      if (firstFrame) latest.current.onHealth("success");
       setLoaded(true);
       clearTimeout(startup);
       setStatus("");
@@ -143,6 +160,7 @@ export function Player(p: Props) {
     const waiting = () => {
       if (ready && !v.paused && !v.seeking && !stalledAt) {
         stalls++;
+        latest.current.onHealth("stall");
         stalledAt = performance.now();
         setStatus("Buffering…");
       }
@@ -152,8 +170,16 @@ export function Player(p: Props) {
         stalledMs += performance.now() - stalledAt;
         stalledAt = 0;
       }
-      if (stalledAt && performance.now() - stalledAt > 30000)
-        fail("Playback stalled for 30 seconds.");
+      if (
+        stalledAt &&
+        performance.now() - stalledAt >
+          (p.settings.autoSourceSwitch ? 15000 : 30000)
+      )
+        fail(
+          p.settings.autoSourceSwitch
+            ? "Playback kept buffering. Trying another source."
+            : "Playback stalled for 30 seconds.",
+        );
       let ahead = 0;
       for (let i = 0; i < v.buffered.length; i++) {
         if (
@@ -191,8 +217,13 @@ export function Player(p: Props) {
                   manifestLoadingTimeOut: 120000,
                   levelLoadingTimeOut: 120000,
                   fragLoadingTimeOut: 60000,
+                  maxBufferLength: Math.max(
+                    p.bufferTarget,
+                    p.settings.maxBitrate > 0 ? 45 : 75,
+                  ),
+                  maxMaxBufferLength: 120,
                 }
-              : {},
+              : { maxBufferLength: p.bufferTarget, maxMaxBufferLength: 90 },
           );
           hls.loadSource(p.url);
           hls.attachMedia(v);
@@ -264,6 +295,26 @@ export function Player(p: Props) {
           ? "showing"
           : "disabled";
   }, [caption, p.tracks]);
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    for (const track of Array.from(v.textTracks))
+      for (const cue of Array.from(track.cues || [])) {
+        const item = cue as VTTCue;
+        const original = Number((item as any).__stillStart ?? item.startTime);
+        const originalEnd = Number((item as any).__stillEnd ?? item.endTime);
+        (item as any).__stillStart = original;
+        (item as any).__stillEnd = originalEnd;
+        item.startTime = Math.max(
+          0,
+          original + Number(p.settings.subtitleOffset || 0),
+        );
+        item.endTime = Math.max(
+          item.startTime + 0.1,
+          originalEnd + Number(p.settings.subtitleOffset || 0),
+        );
+      }
+  }, [p.settings.subtitleOffset, p.tracks]);
   useEffect(() => {
     if (countdown === null) return;
     if (!autoplayAllowed(p.settings.autoplay)) {
@@ -393,6 +444,13 @@ export function Player(p: Props) {
               </select>
             </label>
             <button onClick={p.onSources}>Change source</button>
+            <label>
+              Subtitle timing
+              <span>
+                {p.settings.subtitleOffset > 0 ? "+" : ""}
+                {p.settings.subtitleOffset.toFixed(1)} s
+              </span>
+            </label>
             <p aria-label="Playback diagnostics">{diagnostics}</p>
             <p>
               Preferred audio: {p.settings.audio.toUpperCase()}. Available

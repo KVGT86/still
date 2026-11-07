@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T00:00:00.000Z",
+  "title": "Design System: Still",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Household Green", "canonical": "#354c3c", "tonalRamp": ["#142019", "#203027", "#354c3c", "#536b59", "#748b79", "#9bac9e", "#c4cfc3", "#edf1eb"] },
+      "background": { "role": "neutral", "displayName": "Quiet Linen", "canonical": "#f6f5f1", "tonalRamp": ["#22231f", "#3e3f39", "#5c5d56", "#7c7d75", "#9e9f97", "#c2c1ba", "#e2e1db", "#f6f5f1"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Manrope Display", "purpose": "Page, title and section headings." },
+      "body": { "displayName": "DM Sans Body", "purpose": "Controls, metadata and prose." }
+    },
+    "shadows": [
+      { "name": "ambient-panel", "value": "0 28px 100px #262f2722", "purpose": "Floating navigation, overlays and feedback only." }
+    ],
+    "motion": [
+      { "name": "state", "value": "160ms ease-out", "purpose": "Control and focus state transitions." }
+    ],
+    "breakpoints": [
+      { "name": "compact-landscape", "value": "1100px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action for a focused task.",
+      "html": "<button class=\"ds-button-primary\">Continue</button>",
+      "css": ".ds-button-primary{background:#354c3c;color:#fffefa;border:1px solid #354c3c;border-radius:12px;padding:14px 24px;font:500 16px 'DM Sans',sans-serif;transition:background .16s ease-out,transform .16s ease-out}.ds-button-primary:hover{background:#252a24}.ds-button-primary:active{transform:scale(.98)}.ds-button-primary:focus-visible{outline:3px solid #354c3c;outline-offset:5px}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Labelled profile and settings field.",
+      "html": "<input class=\"ds-input\" value=\"English\" aria-label=\"Example field\">",
+      "css": ".ds-input{background:#fffefa;color:#252a24;border:1px solid #e5e5dc;border-radius:10px;padding:13px 16px;min-height:48px;font:400 16px 'DM Sans',sans-serif}.ds-input:hover{border-color:#6b7065}.ds-input:focus-visible{outline:3px solid #354c3c;outline-offset:5px}"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "description": "Quiet rail destination with a raised active state.",
+      "html": "<button class=\"ds-nav-item\">Saved</button>",
+      "css": ".ds-nav-item{background:transparent;color:#6b7065;border:0;border-radius:12px;padding:12px 18px;min-height:48px;font:400 16px 'DM Sans',sans-serif}.ds-nav-item:hover,.ds-nav-item:focus-visible{background:#fffefa;color:#252a24;box-shadow:0 12px 36px #262f2714;outline:0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Living Room",
+    "overview": "Still uses the restraint of a well-made household object: pale neutral fields, deep green controls, generous spacing and information that appears only when it helps.",
+    "keyCharacteristics": ["Light-first with a deliberate neutral dark theme.", "Quiet surfaces and sparse accent colour.", "Remote, keyboard and touch share one vocabulary."],
+    "rules": [
+      { "name": "Sparse Accent", "body": "Green identifies action, selection and status. It is not general decoration.", "section": "colors" },
+      { "name": "Television Test", "body": "Primary labels and active state remain unambiguous at viewing distance.", "section": "typography" }
+    ],
+    "dos": ["Do keep common playback and browsing paths visually quiet.", "Do use Lucide icons consistently."],
+    "donts": ["Don't use purple as a product accent.", "Don't use em dashes in product copy."]
+  }
+}

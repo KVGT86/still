@@ -1,4 +1,4 @@
-# Stremio Client Redesign - Product Specification v1
+# Still Product Specification v2
 
 ## Product statement
 
@@ -18,6 +18,8 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 - Remote-first television interaction, LG Magic Remote pointer support, and touch-first tablet interaction.
 - Light and neutral dark themes, with light as the default and no purple identity.
 - A fully self-hostable profile-sync and recommendation service for multi-profile mode.
+- Playback reliability learning, source transparency, profile backup and lightweight Saved collections.
+- Profile-scoped text size, reduced motion and high-contrast focus preferences.
 
 ### Excluded
 
@@ -25,8 +27,9 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 - Live TV, channels, podcasts, local files, downloads, intentional offline use, casting, and external players.
 - Child profiles, parental controls, or content restrictions.
 - Official app-store publication.
-- Portrait tablet layouts, tablet keyboard/trackpad navigation, system text scaling, and reduced-motion adaptation.
+- Portrait tablet layouts and tablet keyboard/trackpad-specific layouts.
 - Public internet exposure or a second pairing mechanism beyond Tailscale membership.
+- Signed Android distribution, automatic app updates, Android TV home recommendations, operating-system media sessions, further LG Magic Remote calibration and crash reporting.
 
 ## External dependencies
 
@@ -59,6 +62,8 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 - Any user may create, rename, PIN-protect, or delete profiles.
 - Profile deletion requires explicit confirmation and removes that profile's synchronised data.
 - Profiles do not provide child or content-restriction modes.
+- Profiles may be reordered and exported or restored as small JSON backups.
+- Profile settings include theme, text size, accessibility, language, playback and device-capability preferences.
 
 ## Information architecture
 
@@ -72,7 +77,7 @@ The primary navigation contains exactly:
 
 Home contains only Continue Watching. Browsing and discovery do not appear on Home.
 
-Saved is one profile-specific collection. There is no Watchlist/Favourites split.
+Saved remains the profile-specific Stremio-backed list. Lightweight collections may group Saved titles without changing that underlying library. There is no Watchlist/Favourites split.
 
 ## Continue Watching
 
@@ -92,25 +97,31 @@ Saved is one profile-specific collection. There is no Watchlist/Favourites split
 - Not Interested excludes that title from future recommendations.
 - Already Watched affects future ranking without recommending the same title again.
 - More Like This boosts similar titles.
+- Hidden titles can be restored from Settings.
+- Recommended may show new episodes from Saved; Saved may highlight recently released titles.
 - The algorithm is a replaceable black box; its required inputs and outcomes are fixed, but its implementation is not.
 
 ## Source resolution
 
 Each profile stores preferred audio language, preferred subtitle language, whether subtitles normally start enabled, and autoplay mode.
 
-Each device derives a maximum supported video quality. The app detects the device capability automatically and allows the user to lower the ceiling manually.
+Each device derives a maximum supported video quality. A profile stores the preferred quality and bitrate; the current device applies its own lower hardware ceiling when required.
 
 Automatic source selection follows this order:
 
 1. Exclude sources above the device's configured quality ceiling.
 2. Never exclude a source for its language, because add-ons rarely tag it. Sources clearly tagged with a different language than the profile's preferred audio language are tried last.
-3. Prefer sources with a healthy swarm (at least 15 peers), then the strongest quality available within the device ceiling.
-4. Rank otherwise suitable sources by user availability, such as peers or seed count when the addon exposes it.
+3. Demote sources whose declared video or audio codec is unsupported and explain the incompatible part separately.
+4. Prefer sources that previously played successfully for this profile and penalise repeated failures or stalls.
+5. Prefer sources with a healthy swarm (at least 15 peers), then the strongest quality available within the device ceiling.
+6. Rank otherwise suitable sources by user availability, such as peers or seed count when the addon exposes it.
 5. Apply the preferred subtitle language when available; subtitles are optional and never prevent automatic playback.
 
 If no source fits the quality ceiling, the app shows every available source for manual selection. It must not silently relax the ceiling.
 
 If the selected automatic source fails, the app tries the next matching ranked source. When every matching source fails, it opens the complete manual list and marks each failed source.
+
+The manual list always includes every source. It exposes temporary sorting, a plain-language selection reason, separate codec compatibility, HDR, file size, peer and provider badges when that metadata is available.
 
 Individual addon failures are silent when other addons return usable results. If no addon supplies a playable source, the client shows **No sources available**.
 
@@ -122,13 +133,19 @@ Individual addon failures are silent when other addons return usable results. If
 - Scheduled autoplay is active from 07:00 until 22:00 using device-local time.
 - Autoplay has three modes: On, Off, and Scheduled.
 - On and Off override the schedule.
+- Switching sources keeps the most recent playback position.
+- Direct HTTP sources receive a short non-blocking availability preflight.
+- Buffer targets adapt from the profile's stall history. Sustained buffering may switch to the next source when automatic recovery is enabled.
+- Android supports a profile bitrate cap, hardware audio offload and frame-rate matching where the television and operating system permit them.
+- Subtitle timing may be adjusted by the profile without delaying playback.
 
 ## Synchronisation and resilience
 
 - Intentional offline operation is not supported.
 - Brief companion-service interruptions must not block browsing or playback when cached profile data is available.
 - Changes made during a brief interruption are queued and synchronised when the service becomes reachable again.
-- Multi-device offline conflict resolution is outside scope because the product assumes connectivity.
+- The client exposes pending changes, cached-data use and the last successful sync. If local and remote copies overlap, the user may choose which copy leads.
+- Settings shows profile-service version, engine reachability, database size, host reserve and backup age when available.
 - Expired Stremio authentication prompts reauthentication without deleting local or companion-service profile data.
 
 ## Platform and input behaviour
@@ -138,7 +155,7 @@ Individual addon failures are silent when other addons return usable results. If
 - LG webOS supports both directional focus navigation and Magic Remote pointer interaction.
 - Android tablet uses touch interaction only.
 - Every actionable television element has an unambiguous visible focus state.
-- Both themes maintain readable contrast; broader system accessibility adaptation is not a v1 requirement.
+- Both themes maintain readable contrast. Profile preferences provide text scaling, reduced motion and a stronger focus treatment, while controls expose screen-reader names and status does not rely on colour alone.
 
 ## Theme behaviour
 

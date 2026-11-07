@@ -8,6 +8,12 @@ import {
   libraryChange,
   writeLibrary,
 } from "./api";
+export type SyncInfo = {
+  state: "loading" | "synced" | "pending" | "cached";
+  lastSynced: number;
+  pending: number;
+  message: string;
+};
 export function readLocal<T>(key: string, fallback: T): T {
   try {
     return JSON.parse(localStorage.getItem(key) || "null") ?? fallback;
@@ -34,6 +40,16 @@ export function useProfileStore(
   const [stateKey, setStateKey] = useState(key);
   const ref = useRef(state);
   const [syncStatus, setSyncStatus] = useState("");
+  const [syncInfo, setSyncInfo] = useState<SyncInfo>({
+    state: "loading",
+    lastSynced: 0,
+    pending: 0,
+    message: "Loading profile",
+  });
+  const [conflict, setConflict] = useState<{
+    local: ProfileState;
+    remote: ProfileState;
+  } | null>(null);
   const dirty = useRef(false);
   const library = useRef<any[]>([]);
   const loaded = useRef(false);
@@ -60,12 +76,22 @@ export function useProfileStore(
         ...stored?.settings,
         theme: stored?.settings?.theme || legacyTheme,
       },
+      sourceHistory: stored?.sourceHistory || {},
+      devices: stored?.devices || {},
+      collections: stored?.collections || {},
     } as ProfileState;
     if (service && stored && !stored.settings?.theme) {
       dirty.current = true;
       localStorage.setItem(key + ":dirty", "true");
     }
     install(cached);
+    if (stored)
+      setSyncInfo({
+        state: "cached",
+        lastSynced: readLocal(key + ":synced", 0),
+        pending: dirty.current ? 1 : 0,
+        message: "Showing saved profile data",
+      });
     const pull = async () => {
       try {
         const incoming = service
@@ -80,15 +106,31 @@ export function useProfileStore(
               (library.current = await readLibrary(session.authKey)),
             );
         if (alive) {
+          if (dirty.current && stored && newest(incoming) > newest(stored))
+            setConflict({ local: ref.current, remote: incoming });
           install(mergeState(ref.current, incoming));
           if (!service) written.current = newest(ref.current);
           loaded.current = true;
           setSyncStatus("");
+          const now = Date.now();
+          localStorage.setItem(key + ":synced", String(now));
+          setSyncInfo({
+            state: dirty.current ? "pending" : "synced",
+            lastSynced: now,
+            pending: dirty.current ? 1 : 0,
+            message: dirty.current ? "One local change waiting" : "Up to date",
+          });
         }
       } catch {
         if (alive) {
           loaded.current = true;
           setSyncStatus("Sync unavailable · changes kept on this device");
+          setSyncInfo((current) => ({
+            ...current,
+            state: "cached",
+            pending: dirty.current ? 1 : 0,
+            message: "Server unavailable, using saved profile data",
+          }));
         }
       }
     };
@@ -155,9 +197,26 @@ export function useProfileStore(
           if (alive) install(mergeState(ref.current, remote));
         }
         if (alive) setSyncStatus("");
+        if (alive) {
+          const now = Date.now();
+          localStorage.setItem(key + ":synced", String(now));
+          setSyncInfo({
+            state: dirty.current ? "pending" : "synced",
+            lastSynced: now,
+            pending: dirty.current ? 1 : 0,
+            message: dirty.current ? "Local changes waiting" : "Up to date",
+          });
+        }
       } catch {
         if (alive)
           setSyncStatus("Sync unavailable · changes kept on this device");
+        if (alive)
+          setSyncInfo((current) => ({
+            ...current,
+            state: "cached",
+            pending: dirty.current ? 1 : 0,
+            message: "Server unavailable, using saved profile data",
+          }));
       } finally {
         working = false;
       }
@@ -198,10 +257,32 @@ export function useProfileStore(
     dirty.current = true;
     localStorage.setItem(key + ":dirty", "true");
     install(next);
+    setSyncInfo((current) => ({
+      ...current,
+      state: "pending",
+      pending: current.pending + 1,
+      message: "Changes waiting to sync",
+    }));
+  }
+  function resolveConflict(choice: "local" | "remote") {
+    if (!conflict) return;
+    if (choice === "remote") {
+      dirty.current = false;
+      localStorage.setItem(key + ":dirty", "false");
+      install(conflict.remote);
+    } else {
+      dirty.current = true;
+      localStorage.setItem(key + ":dirty", "true");
+      install(mergeState(conflict.remote, conflict.local));
+    }
+    setConflict(null);
   }
   return {
     state: (stateKey === key ? state : blankState()) as ProfileState,
     update,
     syncStatus,
+    syncInfo,
+    conflict,
+    resolveConflict,
   };
 }

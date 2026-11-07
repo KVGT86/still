@@ -48,12 +48,13 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 
 - Home containing a large latest item, five recent items, then earlier viewing history; Recommended, Search, Saved and Settings stay in the sidebar.
 - Stremio login and QR linking, existing addon catalogues, metadata, episodes, streams and subtitles.
-- Automatic source selection with a device quality ceiling and runtime codec checks. Language never excludes a source; sources tagged with a different language are tried last. Unknown resolution is kept for manual selection. Sources with unsupported declared codecs are tried last; among compatible sources, healthy swarms and hardware-decoded formats take priority before resolution and reported peers/seeders. This is device capability and availability metadata, not telemetry gathered from other Still users.
-- Automatic fallback through matching sources, then a complete manual list with failures marked.
-- Profile preferences for audio, optional subtitles and autoplay: on, off, or 07:00–22:00 device local time.
+- Automatic source selection with a profile quality and bitrate ceiling, runtime codec checks and device-local playback history. Language never excludes a source; sources tagged with a different language are tried last. Unknown resolution is kept for manual selection. Sources with unsupported declared codecs are tried last; among compatible sources, healthy swarms, hardware-decoded formats and sources that worked before take priority. This is household playback metadata, not telemetry from other Still users.
+- Direct-stream preflight, automatic fallback with resume-position retention, sustained-buffer recovery, then a complete manual list with failures marked. The manual picker explains each choice and shows codec, HDR, file size, peers and provider data when addons supply it.
+- Profile preferences for audio, optional subtitles, subtitle timing, quality, bitrate, audio offload, frame-rate matching and autoplay: on, off, or 07:00–22:00 device local time.
 - Continue Watching begins at 2%; completion at 95% queues the next released unwatched episode. Manual removal does not mark watched.
-- One Saved collection and feedback-driven catalogue ranking: More Like This, Not Interested, Already Watched. This is a deterministic genre-affinity recommendation model and requires no paid AI service.
-- Per-profile light and neutral dark themes, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
+- Saved collections and feedback-driven catalogue ranking: More Like This, Not Interested, Already Watched. Recommended can also surface new episodes from Saved; hidden suggestions can be restored in Settings. This is a deterministic genre-affinity model and requires no paid AI service.
+- Profile export and restore, profile ordering, connected-device history, sync health and overlap resolution for household profiles.
+- Per-profile light and neutral dark themes, text size, reduced motion and high-contrast focus, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
 - Android's built-in Media3 player; browser/webOS HTML video with HLS fallback.
 
 ## What Still cannot do
@@ -119,7 +120,7 @@ Use this when several people share one Stremio account but need separate Saved l
 5. Add the remaining profiles. They begin empty and can have optional 4 to 8 digit PINs.
 6. Connect every Still device to the same service and choose the relevant profile.
 
-Household Saved titles, progress, preferences and recommendation feedback sync through the service. Household activity does not write back into the Stremio account. Disconnecting the service returns the app to the untouched single-profile Stremio path.
+Household Saved titles, progress, preferences, collections, source reliability, device history and recommendation feedback sync through the service. Household activity does not write back into the Stremio account. Disconnecting the service returns the app to the untouched single-profile Stremio path.
 
 The service has no administrator, owner or child role. Anyone with the account-level service session can list and create profiles. A PIN protects that profile's state through the app, but a server or device administrator can still inspect local data.
 
@@ -134,7 +135,7 @@ tailscale serve --bg http://127.0.0.1:8787
 
 Enter the resulting **HTTPS** tailnet URL under Settings → Connect service. The service and production web client share this address. The compose port binds to loopback. No public exposure, extra device pairing, paid account or external recommendation API is needed.
 
-Enter a running service URL, not a folder or file path. The service creates its database automatically in its data directory; Docker manages that directory through the named volume below. It stores profile names, PIN hashes, Saved titles, playback progress, preferences, recommendation feedback and temporary service sessions. It stores no videos, downloaded artwork, Stremio passwords or Stremio authentication keys. The database starts small and grows with your saved titles and viewing history. A single-profile setup can leave Connect service blank and needs no self-hosted database.
+Enter a running service URL, not a folder or file path. The service creates its database automatically in its data directory; Docker manages that directory through the named volume below. It stores profile names, PIN hashes, Saved titles, playback progress, preferences, small source-reliability counters, device sync times, collections, recommendation feedback and temporary service sessions. It stores no videos, downloaded artwork, Stremio passwords or Stremio authentication keys. The database starts small and grows with your saved titles and viewing history. A single-profile setup can leave Connect service blank and needs no self-hosted database.
 
 Without Docker:
 
@@ -161,14 +162,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.2.6-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.3.0-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.2.6-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.3.0-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -219,7 +220,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.2.6_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.3.0_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 

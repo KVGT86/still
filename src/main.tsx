@@ -21,9 +21,15 @@ import {
   rankSources,
   recommend,
   recordProgress,
+  recordSourceResult,
   releasedEpisodes,
   sourceInfo,
   sourceCompatibility,
+  sourceCompatibilityParts,
+  sourceReason,
+  sourceHistoryKey,
+  newEpisodesFromSaved,
+  recentlyReleasedSaved,
   themeAtTime,
 } from "../shared/domain.mjs";
 import { readLocal, useProfileStore } from "./store";
@@ -123,6 +129,41 @@ function detectedQuality() {
       JSON.parse(window.PalmSystem?.deviceInfo || "{}").screenWidth || width;
   } catch {}
   return width >= 3840 ? 2160 : width >= 1920 ? 1080 : 720;
+}
+function manualSources(
+  items: Stream[],
+  audio: string,
+  codecSupport: Record<string, number>,
+  history: ProfileState["sourceHistory"],
+  maxBitrate: number,
+  sort: string,
+) {
+  const ranked = rankSources(items, audio, 2160, codecSupport, history, {
+    maxBitrate,
+    sort,
+  });
+  const seen = new Set(ranked.map((source: Stream) => source.key));
+  return [...ranked, ...items.filter((source) => !seen.has(source.key))];
+}
+function deviceIdentity() {
+  let id = localStorage.getItem("still.deviceId");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("still.deviceId", id);
+  }
+  return {
+    id,
+    name: window.StillNative
+      ? "Android device"
+      : window.StillDesktop
+        ? "Linux computer"
+        : "Web device",
+    platform: window.StillNative
+      ? "Android"
+      : window.StillDesktop
+        ? "Linux"
+        : "Web",
+  };
 }
 function ContinueCard({
   item,
@@ -224,17 +265,39 @@ function App() {
     [streamingServer, setStreamingServer] = useState(
       readLocal("still.streamingServer", ""),
     );
-  const { state, update, syncStatus } = useProfileStore(
-    session,
-    service,
-    serviceToken,
-    active?.id || "",
-    profileToken,
-  );
+  const { state, update, syncStatus, syncInfo, conflict, resolveConflict } =
+    useProfileStore(
+      session,
+      service,
+      serviceToken,
+      active?.id || "",
+      profileToken,
+    );
   const [demoState, setDemoState] = useState<ProfileState>(blankState());
   const data = demo ? demoState : state;
+  const device = useMemo(deviceIdentity, []);
+  const effectiveQuality = Math.min(
+    data.settings.maxQuality || quality,
+    detectedQuality(),
+  );
   const change = (fn: (s: ProfileState) => ProfileState) =>
     demo ? setDemoState(fn) : update(fn);
+  useEffect(() => {
+    if (!active || demo) return;
+    const now = Date.now();
+    change((current) => ({
+      ...current,
+      devices: {
+        ...current.devices,
+        [device.id]: {
+          name: device.name,
+          platform: device.platform,
+          lastSync: now,
+          updatedAt: now,
+        },
+      },
+    }));
+  }, [active?.id]);
   const [addons, setAddons] = useState<Addon[]>([]),
     [catalog, setCatalog] = useState<Meta[]>([]),
     [search, setSearch] = useState(""),
@@ -246,6 +309,8 @@ function App() {
     [resolving, setResolving] = useState(false),
     [loadTitle, setLoadTitle] = useState<Meta | null>(null),
     [stage, setStage] = useState({ label: "", floor: 0, ceil: 0.3 });
+  const [sourceSortOverride, setSourceSortOverride] = useState("");
+  const [savedCollection, setSavedCollection] = useState("");
   const [sources, setSources] = useState<{
       meta: Meta;
       videoId: string;
@@ -293,6 +358,22 @@ function App() {
     return () => window.clearInterval(timer);
   }, [data.settings.theme]);
   useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--text-scale",
+      String(data.settings.textScale || 1),
+    );
+    document.documentElement.dataset.reducedMotion = String(
+      !!data.settings.reducedMotion,
+    );
+    document.documentElement.dataset.highContrastFocus = String(
+      !!data.settings.highContrastFocus,
+    );
+  }, [
+    data.settings.textScale,
+    data.settings.reducedMotion,
+    data.settings.highContrastFocus,
+  ]);
+  useEffect(() => {
     if (!data.settings.interfaceSounds) return;
     const activate = (event: MouseEvent) => {
       const control = (event.target as Element)?.closest(
@@ -332,6 +413,21 @@ function App() {
       setProfiles(await api.companion(service, "/profiles", serviceToken));
     } catch (e) {
       setError(message(e));
+    }
+  }
+  async function moveProfile(index: number, direction: number) {
+    const next = [...profiles];
+    const destination = index + direction;
+    if (!service || destination < 0 || destination >= next.length) return;
+    [next[index], next[destination]] = [next[destination], next[index]];
+    setProfiles(next);
+    try {
+      await api.companion(service, "/profiles/reorder", serviceToken, {
+        ids: next.map((profile) => profile.id),
+      });
+    } catch (cause) {
+      setError(message(cause));
+      void refreshProfiles();
     }
   }
   useEffect(() => {
@@ -437,7 +533,7 @@ function App() {
         return;
       }
       if (
-        !e.key.startsWith("Arrow") ||
+        !e.key?.startsWith("Arrow") ||
         form ||
         ["SELECT", "INPUT"].includes(el?.tagName)
       )
@@ -614,8 +710,10 @@ function App() {
     const matching = rankSources(
       list,
       data.settings.audio,
-      quality,
+      effectiveQuality,
       codecSupport,
+      data.sourceHistory,
+      { maxBitrate: data.settings.maxBitrate, sort: "smart" },
     );
     if (!matching.length) {
       setSources({ meta, videoId, items: list, failed: [] });
@@ -653,6 +751,9 @@ function App() {
               new Promise<never[]>((done) => setTimeout(() => done([]), 2500)),
             ]),
       ]);
+      const availability = await api.preflightPlayUrl(url, source);
+      if (!availability.ok)
+        throw new Error("This source is not currently reachable.");
       const tracks = [...(source.subtitles || []), ...extra];
       const fallbackUrl =
         source.infoHash && "webOSSystem" in window
@@ -673,6 +774,7 @@ function App() {
         failed,
       });
     } catch (e) {
+      change((state) => recordSourceResult(state, source, "failure"));
       if (id !== requestId.current) return;
       setResolving(false);
       setError(`${message(e)} ${auto.length ? "Trying another source…" : ""}`);
@@ -704,6 +806,7 @@ function App() {
   function failed(reason: string) {
     if (!play) return;
     const p = play;
+    change((state) => recordSourceResult(state, p.source, "failure"));
     if (p.fallbackUrl) {
       setPlay({ ...p, url: p.fallbackUrl, fallbackUrl: undefined });
       setError("Trying compatibility playback…");
@@ -711,7 +814,7 @@ function App() {
     }
     setPlay(null);
     setError(`${reason} ${p.auto.length ? "Trying another source…" : ""}`);
-    if (p.auto.length)
+    if (p.auto.length && data.settings.autoSourceSwitch)
       void begin(p.meta, p.videoId, p.auto[0], p.auto.slice(1), p.all, [
         ...p.failed,
         p.source.key,
@@ -759,6 +862,7 @@ function App() {
         ...s.saved,
         [meta.id]: {
           meta: compactMeta(meta),
+          episodes: meta.videos?.slice(-200),
           deleted: !!s.saved[meta.id] && !s.saved[meta.id].deleted,
           updatedAt: Date.now(),
         },
@@ -782,13 +886,24 @@ function App() {
     () => (page === "Recommended" ? recommend(catalog, data) : []),
     [page, catalog, data.feedback, data.progress],
   );
-  const continuation = continueItems(data) as any[];
+  const continuation = (continueItems(data) as any[]).filter((item) =>
+    data.settings.continueFilter === "all"
+      ? true
+      : item.meta.type === data.settings.continueFilter,
+  );
+  const newEpisodes = newEpisodesFromSaved(data);
+  const recentSaved = recentlyReleasedSaved(data);
   const recentContinuation = continuation.slice(1, 6);
   const earlierContinuation = continuation.slice(6);
   const titles =
     page === "Saved"
       ? Object.values(data.saved)
-          .filter((x) => !x.deleted)
+          .filter(
+            (x) =>
+              !x.deleted &&
+              (!savedCollection ||
+                data.collections[savedCollection]?.items.includes(x.meta.id)),
+          )
           .map((x) => x.meta)
       : page === "Search"
         ? results
@@ -812,7 +927,7 @@ function App() {
           <div className="profile-content">
             <h1>Who’s watching?</h1>
             <div className="profiles">
-              {profiles.map((p) => (
+              {profiles.map((p, index) => (
                 <div key={p.id}>
                   <button
                     className="profile-tile"
@@ -827,6 +942,27 @@ function App() {
                     <strong>{p.name}</strong>
                     {p.locked && <small>PIN protected</small>}
                   </button>
+                  {service && profiles.length > 1 && (
+                    <div
+                      className="profile-order"
+                      aria-label={`Reorder ${p.name}`}
+                    >
+                      <button
+                        aria-label="Move earlier"
+                        disabled={index === 0}
+                        onClick={() => void moveProfile(index, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        aria-label="Move later"
+                        disabled={index === profiles.length - 1}
+                        onClick={() => void moveProfile(index, 1)}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {service && (
@@ -916,8 +1052,9 @@ function App() {
                   {...{
                     data,
                     change,
-                    quality,
-                    setQuality,
+                    syncInfo,
+                    conflict,
+                    resolveConflict,
                     streamingServer,
                     setStreamingServer,
                     service,
@@ -944,10 +1081,51 @@ function App() {
                       </h1>
                     </div>
                     {page === "Home" && (
-                      <span className="item-count">
-                        {continuation.length} in progress
-                      </span>
+                      <div className="heading-tools">
+                        <select
+                          aria-label="Filter Continue Watching"
+                          value={data.settings.continueFilter}
+                          onChange={(event) =>
+                            change((state) => ({
+                              ...state,
+                              settings: {
+                                ...state.settings,
+                                continueFilter: event.target.value,
+                              },
+                              settingsAt: Date.now(),
+                            }))
+                          }
+                        >
+                          <option value="all">Films and series</option>
+                          <option value="movie">Films</option>
+                          <option value="series">Series</option>
+                        </select>
+                        <span className="item-count">
+                          {continuation.length} in progress
+                        </span>
+                      </div>
                     )}
+                    {page === "Saved" &&
+                      Object.values(data.collections).some(
+                        (collection) => !collection.deleted,
+                      ) && (
+                        <select
+                          aria-label="Filter Saved by collection"
+                          value={savedCollection}
+                          onChange={(event) =>
+                            setSavedCollection(event.target.value)
+                          }
+                        >
+                          <option value="">All saved titles</option>
+                          {Object.entries(data.collections)
+                            .filter(([, collection]) => !collection.deleted)
+                            .map(([id, collection]) => (
+                              <option key={id} value={id}>
+                                {collection.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
                   </div>
                   {page === "Search" && (
                     <div className="search-box">
@@ -1028,6 +1206,20 @@ function App() {
                     )
                   ) : (
                     <>
+                      {page === "Recommended" && !!newEpisodes.length && (
+                        <DiscoveryRow
+                          title="New episodes from Saved"
+                          items={newEpisodes.map((item) => item.meta)}
+                          onOpen={open}
+                        />
+                      )}
+                      {page === "Saved" && !!recentSaved.length && (
+                        <DiscoveryRow
+                          title="Recently released"
+                          items={recentSaved}
+                          onOpen={open}
+                        />
+                      )}
                       {loading ? (
                         <div className="loading" role="status">
                           <Icon name="loading" className="spin" />
@@ -1182,6 +1374,44 @@ function App() {
               >
                 Already watched
               </button>
+              {!!Object.values(data.collections).some(
+                (collection) => !collection.deleted,
+              ) && (
+                <select
+                  aria-label="Add to collection"
+                  defaultValue=""
+                  onChange={(event) => {
+                    const id = event.target.value;
+                    if (!id) return;
+                    change((state) => ({
+                      ...state,
+                      collections: {
+                        ...state.collections,
+                        [id]: {
+                          ...state.collections[id],
+                          items: [
+                            ...new Set([
+                              ...state.collections[id].items,
+                              detail.id,
+                            ]),
+                          ],
+                          updatedAt: Date.now(),
+                        },
+                      },
+                    }));
+                    event.target.value = "";
+                  }}
+                >
+                  <option value="">Add to collection</option>
+                  {Object.entries(data.collections)
+                    .filter(([, collection]) => !collection.deleted)
+                    .map(([id, collection]) => (
+                      <option key={id} value={id}>
+                        {collection.name}
+                      </option>
+                    ))}
+                </select>
+              )}
             </div>
             {detail.type === "series" && (
               <>
@@ -1253,10 +1483,32 @@ function App() {
               <p className="muted">
                 Every available source. Your preferences stay unchanged.
               </p>
+              <label className="source-sort">
+                Sort for this choice
+                <select
+                  value={sourceSortOverride || data.settings.sourceSort}
+                  onChange={(event) =>
+                    setSourceSortOverride(event.target.value)
+                  }
+                >
+                  <option value="smart">Best match</option>
+                  <option value="quality">Quality</option>
+                  <option value="size">Smallest file</option>
+                  <option value="peers">Most peers</option>
+                </select>
+              </label>
               <div className="source-list">
-                {sources.items.map((s) => {
+                {manualSources(
+                  sources.items,
+                  data.settings.audio,
+                  codecSupport,
+                  data.sourceHistory,
+                  data.settings.maxBitrate,
+                  sourceSortOverride || data.settings.sourceSort,
+                ).map((s: Stream) => {
                   const info = sourceInfo(s);
                   const compatibility = sourceCompatibility(info, codecSupport);
+                  const parts = sourceCompatibilityParts(info, codecSupport);
                   const codecs = [info.videoCodec, info.audioCodec]
                     .filter(Boolean)
                     .map((codec) => codecNames[codec] || codec)
@@ -1283,6 +1535,12 @@ function App() {
                         {codecs && (
                           <small>
                             {codecs} ·{" "}
+                            {parts.video === 0
+                              ? "Video incompatible"
+                              : parts.audio === 0
+                                ? "Audio incompatible"
+                                : "Compatible"}{" "}
+                            ·{" "}
                             {compatibility === 0
                               ? "May not play"
                               : compatibility === 2
@@ -1290,6 +1548,34 @@ function App() {
                                 : "Compatibility uncertain"}
                           </small>
                         )}
+                        <small>
+                          {sourceReason(
+                            s,
+                            data.settings.audio,
+                            codecSupport,
+                            data.sourceHistory,
+                          )}
+                        </small>
+                        <span className="source-badges">
+                          {info.hdr && <em>{info.hdr}</em>}
+                          {info.sizeBytes > 0 && (
+                            <em>
+                              {(info.sizeBytes / 1024 ** 3).toFixed(1)} GB
+                            </em>
+                          )}
+                          <em>{info.provider}</em>
+                          {data.sourceHistory[
+                            (
+                              info.provider +
+                              ":" +
+                              (info.videoCodec || "unknown-video") +
+                              ":" +
+                              (info.audioCodec || "unknown-audio") +
+                              ":" +
+                              (info.quality || "unknown-quality")
+                            ).toLowerCase()
+                          ]?.successes > 0 && <em>Worked before</em>}
+                        </span>
                       </span>
                       <span>
                         {sources.failed.includes(s.key)
@@ -1317,12 +1603,21 @@ function App() {
               : data.progress[play.videoId]?.position || 0
           }
           settings={data.settings}
+          bufferTarget={
+            (data.sourceHistory[sourceHistoryKey(play.source)]?.stalls || 0) >=
+            2
+              ? 90
+              : 45
+          }
           onProgress={(position, duration) =>
             change((s) =>
               recordProgress(s, play.meta, play.videoId, position, duration),
             )
           }
           onError={failed}
+          onHealth={(result) =>
+            change((state) => recordSourceResult(state, play.source, result))
+          }
           onClose={() => setPlay(null)}
           onSources={() => {
             setSources({
@@ -1387,7 +1682,19 @@ function App() {
                 );
                 await refreshProfiles();
                 setDialog(null);
-                if (dialog === "edit") setActive(null);
+                if (dialog === "edit") {
+                  if (f.get("pin")) setActive(null);
+                  else
+                    setActive((current) =>
+                      current
+                        ? {
+                            ...current,
+                            name: String(f.get("name")),
+                            avatar: String(f.get("avatar")),
+                          }
+                        : current,
+                    );
+                }
               } catch (e) {
                 setError(message(e));
               }
@@ -1576,6 +1883,36 @@ function Brand() {
         still<span className="brand-dot">.</span>
       </span>
     </div>
+  );
+}
+function DiscoveryRow({
+  title,
+  items,
+  onOpen,
+}: {
+  title: string;
+  items: Meta[];
+  onOpen: (meta: Meta) => void;
+}) {
+  const unique = [
+    ...new Map(items.map((item) => [item.id, item])).values(),
+  ].slice(0, 8);
+  return (
+    <section className="discovery-row">
+      <h2>{title}</h2>
+      <div>
+        {unique.map((item) => (
+          <button key={item.id} onClick={() => void onOpen(item)}>
+            {item.poster ? (
+              <img src={item.poster} alt="" loading="lazy" />
+            ) : (
+              <span>{item.name}</span>
+            )}
+            <strong>{item.name}</strong>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 function Empty({
@@ -1810,6 +2147,40 @@ function Login({
 }
 function Settings(p: any) {
   const { data, change } = p;
+  const [health, setHealth] = useState<any>(null);
+  const [engineOnline, setEngineOnline] = useState<boolean | null>(null);
+  const [collectionName, setCollectionName] = useState("");
+  const hiddenFeedback = Object.entries(
+    data.feedback as ProfileState["feedback"],
+  ).filter(([, value]) => value.value === "hide");
+  useEffect(() => {
+    if (!p.service) return setHealth(null);
+    api
+      .companion(p.service, "/status", readLocal("still.serviceToken", ""))
+      .then(setHealth)
+      .catch(() => setHealth({ ok: false }));
+  }, [p.service]);
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      const base =
+        p.streamingServer ||
+        (window.StillDesktop ? await window.StillDesktop.engineURL() : "");
+      if (!base) return alive && setEngineOnline(null);
+      try {
+        const response = await fetch(api.safeBase(base) + "/settings", {
+          signal: AbortSignal.timeout(4000),
+        });
+        if (alive) setEngineOnline(response.ok);
+      } catch {
+        if (alive) setEngineOnline(false);
+      }
+    };
+    void check();
+    return () => {
+      alive = false;
+    };
+  }, [p.streamingServer]);
   const set = (key: string, value: any) =>
     change((s: ProfileState) => ({
       ...s,
@@ -1845,6 +2216,51 @@ function Settings(p: any) {
               </button>
             ))}
           </div>
+        </Setting>
+        <Setting
+          label="Text size"
+          text="Remembered for this profile across devices."
+        >
+          <select
+            aria-label="Text size"
+            value={data.settings.textScale}
+            onChange={(e) => set("textScale", Number(e.target.value))}
+          >
+            <option value="0.9">Compact</option>
+            <option value="1">Standard</option>
+            <option value="1.15">Large</option>
+            <option value="1.3">Extra large</option>
+          </select>
+        </Setting>
+        <Setting
+          label="Reduced motion"
+          text="Removes decorative movement and shortens transitions."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="Reduced motion"
+            aria-checked={data.settings.reducedMotion}
+            onClick={() => set("reducedMotion", !data.settings.reducedMotion)}
+          >
+            <span />
+          </button>
+        </Setting>
+        <Setting
+          label="High-contrast focus"
+          text="Makes remote and keyboard focus easier to follow."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="High-contrast focus"
+            aria-checked={data.settings.highContrastFocus}
+            onClick={() =>
+              set("highContrastFocus", !data.settings.highContrastFocus)
+            }
+          >
+            <span />
+          </button>
         </Setting>
         <Setting
           label="Interface sounds"
@@ -1929,15 +2345,12 @@ function Settings(p: any) {
         </Setting>
         <Setting
           label="Maximum quality"
-          text="This device only. Automatically detected; lower it any time."
+          text="Profile preference, capped automatically by this device."
         >
           <select
             aria-label="Maximum quality"
-            value={p.quality}
-            onChange={(e) => {
-              p.setQuality(Number(e.target.value));
-              localStorage.setItem("still.quality", e.target.value);
-            }}
+            value={Math.min(data.settings.maxQuality, detectedQuality())}
+            onChange={(e) => set("maxQuality", Number(e.target.value))}
           >
             {[480, 720, 1080, 2160]
               .filter((n) => n <= detectedQuality())
@@ -1946,6 +2359,87 @@ function Settings(p: any) {
                   {n === 2160 ? "4K UHD" : `${n}p`}
                 </option>
               ))}
+          </select>
+        </Setting>
+        <Setting
+          label="Maximum bitrate"
+          text="A lower limit can reduce buffering on slower TVs."
+        >
+          <select
+            aria-label="Maximum bitrate"
+            value={data.settings.maxBitrate}
+            onChange={(e) => set("maxBitrate", Number(e.target.value))}
+          >
+            <option value="0">Automatic</option>
+            <option value="8000000">8 Mbps</option>
+            <option value="15000000">15 Mbps</option>
+            <option value="30000000">30 Mbps</option>
+            <option value="60000000">60 Mbps</option>
+          </select>
+        </Setting>
+        <Setting
+          label="Audio passthrough"
+          text="Allow a compatible TV or receiver to decode surround audio."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="Audio passthrough"
+            aria-checked={data.settings.audioPassthrough}
+            onClick={() =>
+              set("audioPassthrough", !data.settings.audioPassthrough)
+            }
+          >
+            <span />
+          </button>
+        </Setting>
+        <Setting
+          label="Match frame rate"
+          text="Lets Android switch to a closer display refresh rate when supported."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="Match frame rate"
+            aria-checked={data.settings.frameRateMatching}
+            onClick={() =>
+              set("frameRateMatching", !data.settings.frameRateMatching)
+            }
+          >
+            <span />
+          </button>
+        </Setting>
+        <Setting
+          label="Automatic source recovery"
+          text="Switch source after sustained buffering while keeping your position."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="Automatic source recovery"
+            aria-checked={data.settings.autoSourceSwitch}
+            onClick={() =>
+              set("autoSourceSwitch", !data.settings.autoSourceSwitch)
+            }
+          >
+            <span />
+          </button>
+        </Setting>
+        <Setting
+          label="Subtitle offset"
+          text="Move subtitles earlier or later for this profile."
+        >
+          <select
+            aria-label="Subtitle offset"
+            value={data.settings.subtitleOffset}
+            onChange={(e) => set("subtitleOffset", Number(e.target.value))}
+          >
+            {[-3, -2, -1, -0.5, 0, 0.5, 1, 2, 3].map((value) => (
+              <option key={value} value={value}>
+                {value > 0 ? "+" : ""}
+                {value.toFixed(1)} s
+              </option>
+            ))}
           </select>
         </Setting>
         <Setting
@@ -1972,6 +2466,274 @@ function Settings(p: any) {
         </Setting>
       </section>
       <section>
+        <h2>Sync and storage</h2>
+        <div className="health-grid" role="status">
+          <div>
+            <strong>
+              {p.syncInfo?.state === "synced"
+                ? "Synced"
+                : p.syncInfo?.state === "pending"
+                  ? "Waiting to sync"
+                  : "Saved on this device"}
+            </strong>
+            <span>{p.syncInfo?.message}</span>
+          </div>
+          <div>
+            <strong>
+              {health?.ok
+                ? "Server online"
+                : p.service
+                  ? "Server unavailable"
+                  : "Stremio profile"}
+            </strong>
+            <span>
+              {health?.version
+                ? `Host ${health.version}`
+                : "No household host required"}
+            </span>
+          </div>
+          <div>
+            <strong>
+              {engineOnline === true
+                ? "Streaming engine online"
+                : engineOnline === false
+                  ? "Streaming engine unavailable"
+                  : "Streaming engine on demand"}
+            </strong>
+            <span>
+              {engineOnline === false
+                ? "Torrent playback will retry another source"
+                : "Used only for torrent sources"}
+            </span>
+          </div>
+          <div>
+            <strong>
+              {health?.storage?.databaseBytes != null
+                ? `${(health.storage.databaseBytes / 1024 / 1024).toFixed(1)} MB profile data`
+                : "Minimal storage"}
+            </strong>
+            <span>
+              {health?.storage?.freeBytes != null
+                ? `${(health.storage.freeBytes / 1024 ** 3).toFixed(0)} GB free on host`
+                : "Media is not stored here"}
+            </span>
+          </div>
+          <div>
+            <strong>
+              {health?.backupAge != null
+                ? `Backup ${Math.max(0, Math.floor(health.backupAge / 86400000))} days ago`
+                : "Backup age unavailable"}
+            </strong>
+            <span>
+              {p.syncInfo?.lastSynced
+                ? `Last sync ${new Date(p.syncInfo.lastSynced).toLocaleString()}`
+                : "Not synced yet"}
+            </span>
+          </div>
+          {health?.version && health.version !== "0.3.0" && (
+            <div>
+              <strong>Host update recommended</strong>
+              <span>App 0.3.0, host {health.version}</span>
+            </div>
+          )}
+        </div>
+        {p.conflict && (
+          <div className="conflict">
+            <strong>Profile changes overlap</strong>
+            <p>
+              Choose which copy should lead. The other copy remains in this
+              device cache until the next successful sync.
+            </p>
+            <button onClick={() => p.resolveConflict("local")}>
+              Keep this device
+            </button>
+            <button onClick={() => p.resolveConflict("remote")}>
+              Use server copy
+            </button>
+          </div>
+        )}
+        <Setting
+          label="Profile backup"
+          text="Export or restore this profile as a small JSON file."
+        >
+          <div className="inline-actions">
+            <button
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], {
+                  type: "application/json",
+                });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `still-profile-${Date.now()}.json`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+              }}
+            >
+              Export
+            </button>
+            <label className="button-label">
+              Restore
+              <input
+                type="file"
+                accept="application/json"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file || file.size > 4 * 1024 * 1024)
+                    return alert(
+                      "Choose a Still profile backup smaller than 4 MB.",
+                    );
+                  file
+                    .text()
+                    .then((text) => {
+                      const restored = JSON.parse(text);
+                      if (
+                        !restored.settings ||
+                        !restored.saved ||
+                        !restored.progress ||
+                        [
+                          restored.saved,
+                          restored.progress,
+                          restored.feedback,
+                        ].some(
+                          (value) =>
+                            !value ||
+                            typeof value !== "object" ||
+                            Array.isArray(value) ||
+                            Object.keys(value).length > 10000,
+                        )
+                      )
+                        throw new Error("Invalid profile backup");
+                      change(() => ({
+                        ...blankState(),
+                        ...restored,
+                        sourceHistory: restored.sourceHistory || {},
+                        devices: restored.devices || {},
+                        collections: restored.collections || {},
+                        settings: {
+                          ...blankState().settings,
+                          ...restored.settings,
+                        },
+                        settingsAt: Date.now(),
+                      }));
+                    })
+                    .catch(() =>
+                      alert("This profile backup could not be restored."),
+                    );
+                }}
+              />
+            </label>
+          </div>
+        </Setting>
+        <Setting
+          label="Connected devices"
+          text="Devices that have synced this profile."
+        >
+          <div className="device-list">
+            {Object.entries(data.devices).map(([id, device]: any) => (
+              <span key={id}>
+                <strong>{device.name}</strong>
+                <small>
+                  {device.platform} ·{" "}
+                  {new Date(device.lastSync).toLocaleDateString()}
+                </small>
+              </span>
+            ))}
+          </div>
+        </Setting>
+      </section>
+      <section>
+        <h2>Collections</h2>
+        <Setting
+          label="Lightweight collections"
+          text="Group saved titles without changing your Stremio library."
+        >
+          <form
+            className="inline-actions"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const name = collectionName.trim();
+              if (!name) return;
+              const id = crypto.randomUUID();
+              change((state: ProfileState) => ({
+                ...state,
+                collections: {
+                  ...state.collections,
+                  [id]: { name, items: [], updatedAt: Date.now() },
+                },
+              }));
+              setCollectionName("");
+            }}
+          >
+            <input
+              aria-label="Collection name"
+              value={collectionName}
+              onChange={(e) => setCollectionName(e.target.value)}
+              placeholder="Collection name"
+            />
+            <button>Create</button>
+          </form>
+        </Setting>
+        {Object.entries(data.collections)
+          .filter(([, value]: any) => !value.deleted)
+          .map(([id, value]: any) => (
+            <Setting
+              key={id}
+              label={value.name}
+              text={`${value.items.length} saved title${value.items.length === 1 ? "" : "s"}`}
+            >
+              <button
+                onClick={() =>
+                  change((state: ProfileState) => ({
+                    ...state,
+                    collections: {
+                      ...state.collections,
+                      [id]: {
+                        ...state.collections[id],
+                        deleted: true,
+                        updatedAt: Date.now(),
+                      },
+                    },
+                  }))
+                }
+              >
+                Remove
+              </button>
+            </Setting>
+          ))}
+      </section>
+      <section>
+        <h2>Recommendations</h2>
+        {hiddenFeedback.length ? (
+          hiddenFeedback.map(([id, value]) => (
+            <Setting
+              key={id}
+              label={value.meta.name}
+              text="Hidden from personalised recommendations."
+            >
+              <button
+                onClick={() =>
+                  change((state: ProfileState) => ({
+                    ...state,
+                    feedback: {
+                      ...state.feedback,
+                      [id]: {
+                        ...state.feedback[id],
+                        value: "neutral",
+                        updatedAt: Date.now(),
+                      },
+                    },
+                  }))
+                }
+              >
+                Show again
+              </button>
+            </Setting>
+          ))
+        ) : (
+          <p className="muted">Nothing is hidden from your recommendations.</p>
+        )}
+      </section>
+      <section>
         <h2>Account & profiles</h2>
         <Setting
           label="Household profiles"
@@ -1996,7 +2758,7 @@ function Settings(p: any) {
         )}
       </section>
       <p className="fine-print">
-        Still 0.2.6 · An independent Stremio client.
+        Still 0.3.0 · An independent Stremio client.
         <br />
         Configured addons supply catalogues and sources. No content is hosted by
         Still.

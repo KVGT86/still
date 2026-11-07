@@ -16,6 +16,9 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter;
+import androidx.media3.extractor.text.CuesWithTiming;
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
+import androidx.media3.extractor.text.SubtitleParser;
 import androidx.media3.ui.PlayerView;
 import java.util.*;
 import org.json.JSONArray;
@@ -42,6 +45,7 @@ public class PlaybackActivity extends Activity {
     private int stallCount;
     private int networkRecoveries;
     private boolean resumeAfterPause;
+    private boolean autoSourceSwitch;
     private DefaultBandwidthMeter bandwidth;
     private final Runnable hide = () -> { if (player != null && player.isPlaying()) { top.setVisibility(View.INVISIBLE); bottom.setVisibility(View.INVISIBLE); } };
     private final Runnable report = new Runnable() {
@@ -60,22 +64,34 @@ public class PlaybackActivity extends Activity {
         super.onCreate(state); current=this; getWindow().setFlags(1024, 1024); getWindow().addFlags(128);
         try {
             JSONObject payload = new JSONObject(getIntent().getStringExtra("payload"));
+            autoSourceSwitch = payload.optBoolean("autoSourceSwitch", true);
             Map<String, String> requestHeaders = new HashMap<>(); JSONObject headers = payload.optJSONObject("headers");
             if (headers != null) for (Iterator<String> keys = headers.keys(); keys.hasNext();) { String key = keys.next(); requestHeaders.put(key, headers.getString(key)); }
             DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory().setDefaultRequestProperties(requestHeaders).setAllowCrossProtocolRedirects(true).setConnectTimeoutMs(60000).setReadTimeoutMs(60000); // the engine holds a request open while it finds torrent peers
             // A larger in-memory reserve absorbs brief peer/network stalls without disk caching.
+            long maxBitrate = payload.optLong("maxBitrate", 0);
+            int learnedTarget = payload.optInt("bufferTarget", 45) * 1000;
+            int minBuffer = Math.max(learnedTarget, maxBitrate > 30000000 ? 65000 : 45000);
+            int maxBuffer = Math.max(minBuffer + 30000, maxBitrate > 30000000 ? 120000 : 90000);
             DefaultLoadControl buffering = new DefaultLoadControl.Builder()
-                .setBufferDurationsMs(50000, 90000, 3000, 8000)
+                .setBufferDurationsMs(minBuffer, maxBuffer, 3000, 8000)
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .build();
             bandwidth = DefaultBandwidthMeter.getSingletonInstance(this);
             DefaultDataSource.Factory data = new DefaultDataSource.Factory(this, http).setTransferListener(bandwidth);
-            player = new ExoPlayer.Builder(this).setLoadControl(buffering).setBandwidthMeter(bandwidth).setMediaSourceFactory(new DefaultMediaSourceFactory(data)).build();
-            player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setPreferredAudioLanguage(payload.optString("audio", "en")).setPreferredTextLanguage(payload.optString("subtitle", "en")).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !payload.optBoolean("subtitles", true)).build());
+            DefaultMediaSourceFactory mediaSources = new DefaultMediaSourceFactory(data);
+            long subtitleOffsetUs = Math.round(payload.optDouble("subtitleOffset", 0) * 1000000.0);
+            if (subtitleOffsetUs != 0) mediaSources.setSubtitleParserFactory(offsetSubtitleFactory(subtitleOffsetUs));
+            player = new ExoPlayer.Builder(this).setLoadControl(buffering).setBandwidthMeter(bandwidth).setMediaSourceFactory(mediaSources).build();
+            TrackSelectionParameters.Builder selection = player.getTrackSelectionParameters().buildUpon().setPreferredAudioLanguage(payload.optString("audio", "en")).setPreferredTextLanguage(payload.optString("subtitle", "en")).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !payload.optBoolean("subtitles", true));
+            if (maxBitrate > 0) selection.setMaxVideoBitrate((int)Math.min(Integer.MAX_VALUE, maxBitrate));
+            selection.setAudioOffloadPreferences(new TrackSelectionParameters.AudioOffloadPreferences.Builder().setAudioOffloadMode(payload.optBoolean("audioPassthrough", false) ? TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED : TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED).build());
+            player.setTrackSelectionParameters(selection.build());
+            player.setVideoChangeFrameRateStrategy(payload.optBoolean("frameRateMatching", true) ? C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS : C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF);
             buildControls(payload);
             playbackStartedAt = android.os.SystemClock.elapsedRealtime();
             player.addListener(new Player.Listener() {
-                @Override public void onRenderedFirstFrame() { if (firstFrameMs == 0) firstFrameMs = android.os.SystemClock.elapsedRealtime() - playbackStartedAt; }
+                @Override public void onRenderedFirstFrame() { if (firstFrameMs == 0) { firstFrameMs = android.os.SystemClock.elapsedRealtime() - playbackStartedAt; if (MainActivity.current != null) MainActivity.current.playbackHealth("success"); } }
                 @Override public void onPlayerError(PlaybackException exception) {
                     boolean transientNetwork = exception.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
                         || exception.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT;
@@ -88,7 +104,7 @@ public class PlaybackActivity extends Activity {
                 @Override public void onIsPlayingChanged(boolean playing) { if (playing) reveal(); }
                 @Override public void onPlaybackStateChanged(int state) {
                     long now = android.os.SystemClock.elapsedRealtime();
-                    if (state == Player.STATE_BUFFERING && ready && player.getPlayWhenReady() && !seeking && stallStartedAt == 0) { stallCount++; stallStartedAt = now; }
+                    if (state == Player.STATE_BUFFERING && ready && player.getPlayWhenReady() && !seeking && stallStartedAt == 0) { stallCount++; stallStartedAt = now; if (MainActivity.current != null) MainActivity.current.playbackHealth("stall"); handler.postDelayed(() -> { if (!finished && autoSourceSwitch && stallStartedAt != 0 && android.os.SystemClock.elapsedRealtime() - stallStartedAt >= 15000) { error = "Playback kept buffering. Trying another source."; finish(); } }, 15000); }
                     if (state != Player.STATE_BUFFERING && stallStartedAt != 0) { stalledMs += now - stallStartedAt; stallStartedAt = 0; }
                     spinner.setVisibility(state == Player.STATE_READY || state == Player.STATE_ENDED ? View.GONE : View.VISIBLE);
                     if (state == Player.STATE_READY) { ready = true; finishLoader(); }
@@ -122,6 +138,23 @@ public class PlaybackActivity extends Activity {
         bottom.addView(transport); root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM)); buildLoader(root, payload); root.setOnClickListener(v -> reveal()); setContentView(root); pause.requestFocus(); reveal();
     }
     private LinearLayout row() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.HORIZONTAL); view.setGravity(Gravity.CENTER_VERTICAL); return view; }
+    private SubtitleParser.Factory offsetSubtitleFactory(long offsetUs) {
+        DefaultSubtitleParserFactory base = new DefaultSubtitleParserFactory();
+        return new SubtitleParser.Factory() {
+            @Override public boolean supportsFormat(Format format) { return base.supportsFormat(format); }
+            @Override public int getCueReplacementBehavior(Format format) { return base.getCueReplacementBehavior(format); }
+            @Override public SubtitleParser create(Format format) {
+                SubtitleParser parser = base.create(format);
+                return new SubtitleParser() {
+                    @Override public void parse(byte[] data, int offset, int length, SubtitleParser.OutputOptions options, androidx.media3.common.util.Consumer<CuesWithTiming> output) {
+                        parser.parse(data, offset, length, options, cues -> output.accept(new CuesWithTiming(cues.cues, Math.max(0, cues.startTimeUs + offsetUs), cues.durationUs)));
+                    }
+                    @Override public int getCueReplacementBehavior() { return parser.getCueReplacementBehavior(); }
+                    @Override public void reset() { parser.reset(); }
+                };
+            }
+        };
+    }
     private void showStatistics() {
         Format video = player.getVideoFormat();
         androidx.media3.exoplayer.DecoderCounters counters = player.getVideoDecoderCounters();

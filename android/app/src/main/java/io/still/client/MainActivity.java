@@ -28,6 +28,7 @@ public class MainActivity extends Activity {
   }
  }
  void progress(double position,double duration){web.evaluateJavascript("window.stillProgress?.({position:"+position+",duration:"+duration+"})",null);}
+ void playbackHealth(String result){web.evaluateJavascript("window.stillPlaybackHealth?.("+JSONObject.quote(result)+")",null);}
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==10&&data!=null){double position=data.getDoubleExtra("position",0),duration=data.getDoubleExtra("duration",0);web.evaluateJavascript("window.stillProgress?.("+"{position:"+position+",duration:"+duration+",final:true})",null);if(data.hasExtra("error"))web.evaluateJavascript("window.stillPlaybackFailed?.("+JSONObject.quote(data.getStringExtra("error"))+")",null);else if(data.getBooleanExtra("next",false))web.evaluateJavascript("window.stillNext?.()",null);else if(data.getBooleanExtra("sources",false))web.evaluateJavascript("window.stillShowSources?.()",null);else web.evaluateJavascript("window.stillPlaybackEnded?.("+data.getBooleanExtra("ended",false)+")",null);}}
  @Override public void onBackPressed(){web.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))",null);}
  @Override public void onDestroy(){current=null;web.removeJavascriptInterface("StillNative");web.destroy();super.onDestroy();}

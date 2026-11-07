@@ -1,6 +1,7 @@
 import express from "express";
 import { DatabaseSync, backup } from "node:sqlite";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync, statfsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   randomBytes,
   createHash,
@@ -19,6 +20,7 @@ const publicProfile = (p) => ({
   name: p.name,
   avatar: p.avatar,
   locked: !!p.pin,
+  position: Number(p.position || 0),
 });
 export function createApp({
   database = ":memory:",
@@ -42,6 +44,11 @@ export function createApp({
   db.exec(
     "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS profiles (id TEXT PRIMARY KEY, account TEXT NOT NULL, name TEXT NOT NULL, avatar TEXT NOT NULL, pin TEXT, salt TEXT, state TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, account TEXT NOT NULL, expires INTEGER NOT NULL);",
   );
+  const profileColumns = db.prepare("PRAGMA table_info(profiles)").all();
+  if (!profileColumns.some((column) => column.name === "position"))
+    db.exec(
+      "ALTER TABLE profiles ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
+    );
   const unlocks = new Map(),
     limits = new Map();
   const app = express();
@@ -122,8 +129,27 @@ export function createApp({
     db.prepare("DELETE FROM sessions WHERE token=?").run(req.sessionToken);
     res.json({ ok: true });
   });
+  app.get("/api/status", (req, res) => {
+    const root = database === ":memory:" ? null : dirname(database);
+    let storage = null;
+    let backupAge = null;
+    try {
+      if (root) {
+        const disk = statfsSync(root);
+        storage = {
+          freeBytes: Number(disk.bavail) * Number(disk.bsize),
+          databaseBytes: statSync(database).size,
+        };
+        const backup = statSync(join(root, "Backups"));
+        backupAge = Date.now() - backup.mtimeMs;
+      }
+    } catch {}
+    res.json({ ok: true, version, storage, backupAge });
+  });
   const list = (account) =>
-    db.prepare("SELECT * FROM profiles WHERE account=?").all(account);
+    db
+      .prepare("SELECT * FROM profiles WHERE account=? ORDER BY position,name")
+      .all(account);
   app.get("/api/profiles", (req, res) =>
     res.json(list(req.account).map(publicProfile)),
   );
@@ -149,7 +175,10 @@ export function createApp({
         : blankState();
     const id = randomBytes(12).toString("hex"),
       salt = opaque();
-    db.prepare("INSERT INTO profiles VALUES (?,?,?,?,?,?,?)").run(
+    const position = list(req.account).length;
+    db.prepare(
+      "INSERT INTO profiles (id,account,name,avatar,pin,salt,state,position) VALUES (?,?,?,?,?,?,?,?)",
+    ).run(
       id,
       req.account,
       name.trim(),
@@ -157,8 +186,32 @@ export function createApp({
       pin ? pinHash(pin, salt) : null,
       salt,
       JSON.stringify(state),
+      position,
     );
     res.json({ id, name: name.trim(), avatar, locked: !!pin });
+  });
+  app.post("/api/profiles/reorder", (req, res) => {
+    const ids = req.body.ids;
+    const profiles = list(req.account);
+    if (
+      !Array.isArray(ids) ||
+      ids.length !== profiles.length ||
+      new Set(ids).size !== ids.length ||
+      ids.some((id) => !profiles.some((profile) => profile.id === id))
+    )
+      return res.status(400).json({ error: "Provide every profile once." });
+    const update = db.prepare(
+      "UPDATE profiles SET position=? WHERE id=? AND account=?",
+    );
+    db.exec("BEGIN");
+    try {
+      ids.forEach((id, position) => update.run(position, id, req.account));
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+    res.json({ ok: true });
   });
   app.use("/api/profiles/:id", (req, res, next) => {
     const p = db
@@ -256,8 +309,18 @@ export function createApp({
 }
 function validState(state) {
   if (!state || typeof state !== "object" || Array.isArray(state)) return false;
-  for (const field of ["saved", "progress", "feedback"]) {
-    const map = state[field];
+  for (const field of [
+    "saved",
+    "progress",
+    "feedback",
+    "sourceHistory",
+    "devices",
+    "collections",
+  ]) {
+    const optional = ["sourceHistory", "devices", "collections"].includes(
+      field,
+    );
+    const map = state[field] || (optional ? {} : null);
     if (
       !map ||
       typeof map !== "object" ||
@@ -271,9 +334,24 @@ function validState(state) {
         !v ||
         !Number.isFinite(v.updatedAt) ||
         v.updatedAt > Date.now() + 60000 ||
-        !v.meta ||
-        typeof v.meta.id !== "string" ||
-        !["movie", "series"].includes(v.meta.type)
+        (["saved", "progress", "feedback"].includes(field) &&
+          (!v.meta ||
+            typeof v.meta.id !== "string" ||
+            !["movie", "series"].includes(v.meta.type)))
+      )
+        return false;
+      if (
+        field === "saved" &&
+        v.episodes !== undefined &&
+        (!Array.isArray(v.episodes) ||
+          v.episodes.length > 200 ||
+          v.episodes.some(
+            (episode) =>
+              !episode ||
+              typeof episode.id !== "string" ||
+              !Number.isFinite(episode.season) ||
+              !Number.isFinite(episode.episode),
+          ))
       )
         return false;
       if (
@@ -282,6 +360,32 @@ function validState(state) {
           !Number.isFinite(v.duration) ||
           v.position < 0 ||
           v.duration < 0)
+      )
+        return false;
+      if (
+        field === "sourceHistory" &&
+        [v.successes, v.failures, v.stalls].some(
+          (count) => !Number.isFinite(count) || count < 0 || count > 1000000,
+        )
+      )
+        return false;
+      if (
+        field === "devices" &&
+        (typeof v.name !== "string" ||
+          v.name.length > 80 ||
+          typeof v.platform !== "string" ||
+          v.platform.length > 40 ||
+          !Number.isFinite(v.lastSync))
+      )
+        return false;
+      if (
+        field === "collections" &&
+        (typeof v.name !== "string" ||
+          !v.name.trim() ||
+          v.name.length > 80 ||
+          !Array.isArray(v.items) ||
+          v.items.length > 2000 ||
+          v.items.some((id) => typeof id !== "string" || id.length > 200))
       )
         return false;
     }
@@ -299,6 +403,33 @@ function validState(state) {
       typeof state.settings.interfaceSounds === "boolean") &&
     typeof state.settings.subtitles === "boolean" &&
     ["on", "off", "scheduled"].includes(state.settings.autoplay) &&
+    (state.settings.maxQuality === undefined ||
+      [480, 720, 1080, 2160].includes(state.settings.maxQuality)) &&
+    (state.settings.maxBitrate === undefined ||
+      (Number.isFinite(state.settings.maxBitrate) &&
+        state.settings.maxBitrate >= 0 &&
+        state.settings.maxBitrate <= 1000000000)) &&
+    (state.settings.audioPassthrough === undefined ||
+      typeof state.settings.audioPassthrough === "boolean") &&
+    (state.settings.frameRateMatching === undefined ||
+      typeof state.settings.frameRateMatching === "boolean") &&
+    (state.settings.autoSourceSwitch === undefined ||
+      typeof state.settings.autoSourceSwitch === "boolean") &&
+    (state.settings.subtitleOffset === undefined ||
+      (Number.isFinite(state.settings.subtitleOffset) &&
+        Math.abs(state.settings.subtitleOffset) <= 30)) &&
+    (state.settings.textScale === undefined ||
+      [0.9, 1, 1.15, 1.3].includes(state.settings.textScale)) &&
+    (state.settings.reducedMotion === undefined ||
+      typeof state.settings.reducedMotion === "boolean") &&
+    (state.settings.highContrastFocus === undefined ||
+      typeof state.settings.highContrastFocus === "boolean") &&
+    (state.settings.continueFilter === undefined ||
+      ["all", "movie", "series"].includes(state.settings.continueFilter)) &&
+    (state.settings.sourceSort === undefined ||
+      ["smart", "quality", "size", "peers"].includes(
+        state.settings.sourceSort,
+      )) &&
     Number.isFinite(state.settingsAt) &&
     state.settingsAt <= Date.now() + 60000
   );

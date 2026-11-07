@@ -398,6 +398,23 @@ export async function resolvePlayUrl(
   }
   return playUrl(stream, server.trim());
 }
+export async function preflightPlayUrl(url: string, stream: Stream) {
+  if (stream.infoHash || !/^https?:/i.test(url))
+    return { ok: true, checked: false };
+  try {
+    const response = await fetch(url, {
+      method: "HEAD",
+      headers: stream.behaviorHints?.proxyHeaders?.request || {},
+      signal: AbortSignal.timeout(4000),
+    });
+    return {
+      ok: response.ok || ![404, 410].includes(response.status),
+      checked: true,
+    };
+  } catch {
+    return { ok: true, checked: false };
+  }
+}
 export async function companion(
   base: string,
   path: string,

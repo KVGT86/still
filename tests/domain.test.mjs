@@ -12,6 +12,9 @@ import {
   mergeState,
   recommend,
   themeAtTime,
+  recordSourceResult,
+  sourceReason,
+  newEpisodesFromSaved,
 } from "../shared/domain.mjs";
 const meta = {
   id: "series",
@@ -192,5 +195,44 @@ test("recommendations exclude feedback and rank similar genres", () => {
   assert.deepEqual(
     result.map((x) => x.id),
     ["drama", "comedy"],
+  );
+});
+test("source history rewards working providers and explains the choice", () => {
+  const good = {
+    key: "good",
+    name: "Reliable",
+    title: "1080p H.264 AAC",
+    seeders: 20,
+  };
+  const bad = {
+    key: "bad",
+    name: "Unreliable",
+    title: "1080p H.264 AAC",
+    seeders: 50,
+  };
+  let state = blankState();
+  state = recordSourceResult(state, good, "success", 1);
+  state = recordSourceResult(state, bad, "failure", 2);
+  assert.deepEqual(
+    rankSources([bad, good], "en", 1080, {}, state.sourceHistory).map(
+      (source) => source.key,
+    ),
+    ["good", "bad"],
+  );
+  assert.match(
+    sourceReason(good, "en", {}, state.sourceHistory),
+    /Worked 1 time/,
+  );
+});
+test("saved series can surface its newest unwatched episode", () => {
+  const state = blankState();
+  state.saved.series = {
+    meta: { id: "series", type: "series", name: "Series" },
+    episodes: meta.videos,
+    updatedAt: 1,
+  };
+  assert.equal(
+    newEpisodesFromSaved(state, Date.parse("2026-01-01"))[0].episode.id,
+    "e2",
   );
 });

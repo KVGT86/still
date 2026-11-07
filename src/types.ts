@@ -49,9 +49,24 @@ export type Progress = {
   updatedAt: number;
 };
 export type ProfileState = {
-  saved: Record<string, { meta: Meta; deleted?: boolean; updatedAt: number }>;
+  saved: Record<
+    string,
+    { meta: Meta; episodes?: Episode[]; deleted?: boolean; updatedAt: number }
+  >;
   progress: Record<string, Progress>;
   feedback: Record<string, { meta: Meta; value: string; updatedAt: number }>;
+  sourceHistory: Record<
+    string,
+    { successes: number; failures: number; stalls: number; updatedAt: number }
+  >;
+  devices: Record<
+    string,
+    { name: string; platform: string; lastSync: number; updatedAt: number }
+  >;
+  collections: Record<
+    string,
+    { name: string; items: string[]; deleted?: boolean; updatedAt: number }
+  >;
   settings: {
     theme: string;
     interfaceSounds: boolean;
@@ -59,6 +74,17 @@ export type ProfileState = {
     subtitle: string;
     subtitles: boolean;
     autoplay: string;
+    maxQuality: number;
+    maxBitrate: number;
+    audioPassthrough: boolean;
+    frameRateMatching: boolean;
+    autoSourceSwitch: boolean;
+    subtitleOffset: number;
+    textScale: number;
+    reducedMotion: boolean;
+    highContrastFocus: boolean;
+    continueFilter: string;
+    sourceSort: string;
   };
   settingsAt: number;
 };
@@ -67,6 +93,7 @@ export type Profile = {
   name: string;
   avatar: string;
   locked: boolean;
+  position?: number;
 };
 export type Session = {
   authKey: string;
@@ -101,6 +128,7 @@ declare global {
     stillProgress?: (data: any) => void;
     stillPlaybackEnded?: (ended?: boolean) => void;
     stillPlaybackFailed?: (message: string) => void;
+    stillPlaybackHealth?: (result: "success" | "stall") => void;
     stillNext?: () => void;
     stillShowSources?: () => void;
   }

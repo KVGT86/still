@@ -47,6 +47,16 @@ test("service isolates accounts, protects PIN data, merges changes and confirms 
         a,
       )
     ).data;
+    const second = (await call("/profiles", { name: "Second" }, a)).data;
+    assert.equal(
+      (await call("/profiles/reorder", { ids: [second.id, p.id] }, a)).status,
+      200,
+    );
+    assert.deepEqual(
+      (await call("/profiles", undefined, a)).data.map((profile) => profile.id),
+      [second.id, p.id],
+    );
+    assert.equal((await call("/status", undefined, a)).data.ok, true);
     assert.equal(p.locked, true);
     assert.equal(p.pin, undefined);
     assert.equal((await call("/profiles", undefined, b)).data.length, 0);
@@ -78,9 +88,8 @@ test("service isolates accounts, protects PIN data, merges changes and confirms 
     state.settings.theme = "scheduled";
     state.settings.interfaceSounds = true;
     state.settingsAt = Date.now();
-    const accepted = (
-      await call(`/profiles/${p.id}/state`, state, a, u.token)
-    ).data;
+    const accepted = (await call(`/profiles/${p.id}/state`, state, a, u.token))
+      .data;
     assert.ok(accepted.saved.y);
     assert.equal(accepted.settings.theme, "scheduled");
     assert.equal(accepted.settings.interfaceSounds, true);
@@ -90,6 +99,11 @@ test("service isolates accounts, protects PIN data, merges changes and confirms 
     );
     assert.equal(
       (await call(`/profiles/${p.id}/delete`, { confirm: true }, a, u.token))
+        .status,
+      200,
+    );
+    assert.equal(
+      (await call(`/profiles/${second.id}/delete`, { confirm: true }, a))
         .status,
       200,
     );

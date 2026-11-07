@@ -45,6 +45,7 @@ export function playInterfaceSound(kind: Sound) {
   const Audio = window.AudioContext || (window as any).webkitAudioContext;
   if (!Audio) return;
   context ||= new Audio();
-  if (context.state === "suspended") void context.resume().then(() => thock(kind));
+  if (context.state === "suspended")
+    void context.resume().then(() => thock(kind));
   else thock(kind);
 }
