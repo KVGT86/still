@@ -8,7 +8,7 @@ Requires administrator PowerShell, Node 22.16 or newer, an existing Stremio inst
 
 `scripts/windows/setup-storage.ps1` creates a new expanding 8 GiB VHDX at `E:\Still\still.vhdx` and mounts it at `E:\Still\Volume`. Only that new virtual disk is initialised. The E: drive is never formatted. Existing uninitialised disk images are not automatically reformatted.
 
-The volume contains App, Data, Backups, Packages, Temp and Runtime directories. Persistent profile state lives in `Data\still.sqlite`; media cleanup only removes Runtime. The database has a 256 MiB page limit, full synchronous commits and a bounded retained journal. Online backups refresh hourly and retain seven daily snapshots. Backups are checkpointed into single-file SQLite snapshots before rotation.
+The volume contains App, Data, Backups, Packages, Temp and Runtime directories. Persistent profile state lives in `Data\still.sqlite`; media cleanup only removes Runtime. Packages contains the signed private-update manifest plus the current and previous release. The database has a 256 MiB page limit, full synchronous commits and a bounded retained journal. Online backups refresh hourly and retain seven daily snapshots. Backups are checkpointed into single-file SQLite snapshots before rotation.
 
 The engine keeps disposable seek data in Runtime, which is cleared whenever the engine restarts. The supervisor pauses the engine and retries Runtime cleanup when available space drops below a 2 GiB reserve. Engine or cleanup failures do not stop the profile service. The 8 GiB volume constrains app data, media work files and backups together, with margin below 10 decimal GB. A few small launcher/configuration files live alongside the image. Existing Node and Stremio program files are reused in place.
 
@@ -27,21 +27,32 @@ Copy these files onto the Windows PC:
 - `scripts/windows/setup-storage.ps1` → `E:\Still\setup-storage.ps1`
 - `scripts/windows/start-host.ps1` → `E:\Still\start-host.ps1`
 - `scripts/windows/setup-host.ps1` → `E:\Still\setup-host.ps1`
+- `scripts/windows/deploy-update.ps1` → `E:\Still\deploy-update.ps1`
 
 Run `setup-storage.ps1` in Administrator PowerShell. Put `artifacts/host/still-host.tar.gz` inside `E:\Still\Volume`, then run `setup-host.ps1`.
 
 The setup installs a SYSTEM scheduled task named **StillHost**, triggered at boot, without storing a user password. The task mounts the VHDX and supervises the profile service and existing Stremio engine. Both HTTP listeners bind to `127.0.0.1`. Tailscale Serve publishes two private HTTPS endpoints on the PC's MagicDNS name:
 
-| Port | Purpose |
-| --- | --- |
-| 9443 | Still web app, profile API and `/downloads` sideload packages |
-| 9444 | Stremio torrent engine and HLS conversion |
+| Port | Purpose                                                    |
+| ---- | ---------------------------------------------------------- |
+| 9443 | Still web app, profile API and signed `/downloads` updates |
+| 9444 | Stremio torrent engine and HLS conversion                  |
 
 Existing Tailscale Serve listeners are preserved. Setup refuses to replace a conflicting proxy on either chosen port.
 
 For explicitly authorised access by a webOS TV on the same trusted home network, run `setup-host.ps1 -EnableLan`. It adds reverse proxies bound to the PC's specific LAN IPv4 address on 8787 and 11470, plus Windows Firewall rules scoped to that address, the Node executable and LocalSubnet. It does not bind a wildcard address or change existing Tailscale proxies. Reserve the PC's LAN address in DHCP. LAN access is opt-in and remains recorded in the host configuration for subsequent starts.
 
 Connect each signed-in Still client to the profile service, then select the same profile to synchronise Saved titles and progress. Set its streaming-server address to the engine endpoint. Android uses its native player; browser, Linux and LG clients can use the server's HLS conversion. Android/Google TV and tablets can run Tailscale themselves. LG webOS can use the opt-in LAN endpoints when on the same network; otherwise it needs a tailnet-capable gateway.
+
+## Publish a private update
+
+Create `artifacts/updates` on the build computer with `npm run package:updates`, after building the Linux, signed Android release and webOS packages. Copy that directory to the Windows PC and run:
+
+```powershell
+E:\Still\deploy-update.ps1 -Source C:\path\to\updates
+```
+
+The deployment verifies each package against the signed manifest, copies the manifest last and keeps only two package versions. Do not copy the private update key or Android keystore onto the server. Devices need the profile-service address under **Settings → Private update service**, unless they already use that address for household profiles.
 
 ## Check and restart
 

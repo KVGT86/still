@@ -118,12 +118,21 @@ export type Addon = {
 };
 declare global {
   interface Window {
-    StillDesktop?: { engineURL: () => Promise<string> };
+    StillDesktop?: {
+      engineURL: () => Promise<string>;
+      installUpdate: (update: {
+        version: string;
+        url: string;
+        sha256: string;
+        bytes: number;
+      }) => Promise<void>;
+    };
     PalmSystem?: { deviceInfo: string };
     StillNative?: {
       play: (payload: string) => void;
       maxQuality: () => number;
       codecSupport: () => string;
+      installUpdate: (payload: string) => void;
     };
     stillProgress?: (data: any) => void;
     stillPlaybackEnded?: (ended?: boolean) => void;
@@ -131,5 +140,6 @@ declare global {
     stillPlaybackHealth?: (result: "success" | "stall") => void;
     stillNext?: () => void;
     stillShowSources?: () => void;
+    stillUpdateStatus?: (state: string, message: string) => void;
   }
 }

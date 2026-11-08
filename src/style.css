@@ -938,6 +938,18 @@ main {
   width: 245px;
   font-size: 12px;
 }
+.update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.primary-action {
+  background: var(--accent);
+  color: var(--inverse);
+  border-color: transparent;
+}
 .segmented {
   display: flex;
   border: 1px solid var(--line);

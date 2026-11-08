@@ -56,6 +56,7 @@ Browser tests use installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=chromium`
 - Profile export and restore, profile ordering, connected-device history, sync health and overlap resolution for household profiles.
 - Per-profile light and neutral dark themes, text size, reduced motion and high-contrast focus, directional remote focus, Magic Remote pointer interaction, and a landscape-only tablet UI.
 - Android's built-in Media3 player; browser/webOS HTML video with HLS fallback.
+- Signed private updates from the household Tailscale service, with automatic checks, verified packages and two-version retention.
 
 ## What Still cannot do
 
@@ -84,14 +85,14 @@ Every screenshot uses labelled fixture data. Light is the default theme; each pr
 
 ## Compatibility
 
-| Platform               | Status                                 | Player                             | Torrent-source requirement                           | Important limits                                                                    |
-| ---------------------- | -------------------------------------- | ---------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Linux x86-64           | Supported                              | Electron video with HLS conversion | Built-in managed Stremio Service, or a remote engine | Local engine requires `dpkg-deb`; installed engine files use about 240 MiB          |
-| Android TV / Google TV | Supported on Android 8+                | Native Media3                      | Reachable Stremio streaming engine                   | Sideloaded APK; remote-control navigation is supported                              |
-| Android tablet         | Supported on Android 8+                | Native Media3                      | Reachable Stremio streaming engine                   | Landscape only; tested layout target is Galaxy Tab S7                               |
-| LG webOS               | Targeted at webOS 22+                  | Native browser video and HLS       | LAN engine or tailnet gateway                        | Developer Mode sideloads expire; codecs and Magic Remote behaviour vary by firmware |
-| Desktop browser        | Development and self-hosted web client | Browser video and hls.js           | Reachable Stremio streaming engine                   | Browser CORS, mixed-content and codec rules still apply                             |
-| Windows                | Host only                              | Reuses an installed Stremio engine | Existing Stremio installation                        | No native Windows Still shell yet; use the hosted web client                        |
+| Platform               | Status                                 | Player                             | Torrent-source requirement                           | Important limits                                             |
+| ---------------------- | -------------------------------------- | ---------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------ |
+| Linux x86-64           | Supported                              | Electron video with HLS conversion | Built-in managed Stremio Service, or a remote engine | Private updates install per-user and restart the app         |
+| Android TV / Google TV | Supported on Android 8+                | Native Media3                      | Reachable Stremio streaming engine                   | Signed sideload; Android confirms each update installation   |
+| Android tablet         | Supported on Android 8+                | Native Media3                      | Reachable Stremio streaming engine                   | Landscape only; tested layout target is Galaxy Tab S7        |
+| LG webOS               | Targeted at webOS 22+                  | Native browser video and HLS       | LAN engine or tailnet gateway                        | Detects updates; Developer Mode tools must install each IPK  |
+| Desktop browser        | Development and self-hosted web client | Browser video and hls.js           | Reachable Stremio streaming engine                   | Browser CORS, mixed-content and codec rules still apply      |
+| Windows                | Host only                              | Reuses an installed Stremio engine | Existing Stremio installation                        | No native Windows Still shell yet; use the hosted web client |
 
 HTTP(S) streams can play directly when the device supports their codecs. Android can also handle DASH through Media3. Browser and webOS external subtitles currently require CORS-enabled WebVTT URLs. Android accepts WebVTT and SubRip. ASS conversion is not implemented.
 
@@ -162,14 +163,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.3.0-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.4.0-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.3.0-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.4.0-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -196,21 +197,29 @@ Desktop tests need a graphical session or `xvfb-run`. For the actual Stremio con
 
 The Android project requires JDK 17+ and Android SDK platform/build tools 35. Set `ANDROID_HOME` or create an untracked `android/local.properties` with `sdk.dir=/path/to/sdk`.
 
+Initialise the private signing keys once, back them up, then build the signed release APK:
+
 ```sh
 npm ci
+npm run updates:init
 npm run package:android
+set -a
+. ~/.config/still/keys/android-signing.env
+set +a
 cd android
-sh gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+JAVA_HOME=/path/to/jdk17 ANDROID_HOME=/path/to/android-sdk sh gradlew assembleRelease
+adb install app/build/outputs/apk/release/app-release.apk
 ```
 
 For wireless TV installation, enable Developer options and Wireless debugging, pair with `adb pair TV_IP:PAIRING_PORT`, connect with `adb connect TV_IP:CONNECTION_PORT`, then install with:
 
 ```sh
-adb -s TV_IP:CONNECTION_PORT install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s TV_IP:CONNECTION_PORT install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-The launcher appears on both TV and tablet. Landscape is enforced. The bundled client is served from Android's secure asset origin. Only bundled UI pages load inside the WebView; local file and content access are disabled, and native playback uses Media3 with preferred audio/text language selection and request headers. The debug APK is for personal sideloading. Sign a release build with a protected key and stable version code before distributing public releases.
+The launcher appears on both TV and tablet. Landscape is enforced. The bundled client is served from Android's secure asset origin. Only bundled UI pages load inside the WebView; local file and content access are disabled, and native playback uses Media3 with preferred audio/text language selection and request headers.
+
+The first signed installation cannot replace an older debug-signed APK. Uninstall the debug build once, which clears that device's local settings, then install the signed release. Every later update must use the same `android-release.jks`. Losing that key means installed Android devices cannot accept future updates from this project.
 
 ## LG webOS
 
@@ -220,7 +229,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.3.0_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.4.0_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 
@@ -231,6 +240,38 @@ webOS uses a classic IIFE JavaScript bundle rather than ES module script tags, b
 LG's CLI is isolated in `tools/webos/` and installed automatically by the webOS packaging command. Its upstream dependency tree currently has security advisories; it is used only for local packaging/device operations and is never included in the application or companion-service image. Do not run its optional development servers on an untrusted network.
 
 The LG app cannot run Tailscale itself. Use the Windows host's explicitly enabled LAN URLs when the television and server share a trusted network. Otherwise, provide a Tailscale-capable router or gateway. Never forward the profile-service or streaming-engine ports directly to the public internet.
+
+## Private updates over Tailscale
+
+Still checks a signed manifest from the existing profile-service address, or from a separate address entered under **Settings → Private update service**. Checks run at launch and every six hours when enabled.
+
+- Linux verifies the signed manifest and package checksum, installs into a per-user version directory, updates the launcher, retains two local versions and restarts into the new build.
+- Android verifies and downloads the signed APK, then opens Android's required installation confirmation. The first update also asks permission for Still to install packages.
+- LG verifies and reports an available IPK. webOS Developer Mode does not allow the app to install itself, so use `ares-install` from another computer.
+- The hosted web client changes with the server and needs no separate update.
+
+Build all three packages and the signed server bundle:
+
+```sh
+npm run package:linux
+npm run package:android
+set -a
+. ~/.config/still/keys/android-signing.env
+set +a
+(cd android && JAVA_HOME=/path/to/jdk17 ANDROID_HOME=/path/to/android-sdk sh gradlew assembleRelease)
+npm run package:webos
+npm run package:updates
+```
+
+Copy `artifacts/updates/` and `scripts/windows/deploy-update.ps1` to the Windows host, then run:
+
+```powershell
+.\deploy-update.ps1 -Source C:\path\to\updates
+```
+
+The script verifies every checksum, publishes `manifest.json` last and retains only the current and previous package sets in `E:\Still\Volume\Packages`. A complete update set uses about 125 MiB, so retention remains well inside the host's storage cap.
+
+Back up `~/.config/still/keys` somewhere private. It contains both signing identities and must never be committed or copied into the public downloads directory. Clients contain only the non-secret update verification key.
 
 ## Stored data and security
 

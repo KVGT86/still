@@ -1,11 +1,25 @@
 plugins { id 'com.android.application' }
+def releaseKeystore = System.getenv('STILL_ANDROID_KEYSTORE')
+def releaseAlias = System.getenv('STILL_ANDROID_KEY_ALIAS')
+def releaseStorePassword = System.getenv('STILL_ANDROID_STORE_PASSWORD')
+def releaseKeyPassword = System.getenv('STILL_ANDROID_KEY_PASSWORD')
+def releaseSigningReady = [releaseKeystore, releaseAlias, releaseStorePassword, releaseKeyPassword].every { it }
 android {
  namespace 'io.still.client'
  compileSdk 35
- defaultConfig { applicationId 'io.still.client'; minSdk 26; targetSdk 35; versionCode 12; versionName '0.3.0' }
+ defaultConfig { applicationId 'io.still.client'; minSdk 26; targetSdk 35; versionCode 13; versionName '0.4.0' }
+ if (releaseSigningReady) {
+  signingConfigs { release { storeFile file(releaseKeystore); storePassword releaseStorePassword; keyAlias releaseAlias; keyPassword releaseKeyPassword } }
+ }
+ buildTypes { release { if (releaseSigningReady) signingConfig signingConfigs.release } }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
+gradle.taskGraph.whenReady { graph ->
+ if (graph.allTasks.any { it.name.toLowerCase().contains('release') } && !releaseSigningReady)
+  throw new GradleException('Set the four STILL_ANDROID_* signing variables before building a release APK.')
+}
 dependencies {
+ implementation 'androidx.core:core:1.15.0'
  implementation 'androidx.webkit:webkit:1.12.1'
  implementation 'androidx.media3:media3-exoplayer:1.6.1'
  implementation 'androidx.media3:media3-exoplayer-hls:1.6.1'

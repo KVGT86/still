@@ -20,6 +20,7 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 - A fully self-hostable profile-sync and recommendation service for multi-profile mode.
 - Playback reliability learning, source transparency, profile backup and lightweight Saved collections.
 - Profile-scoped text size, reduced motion and high-contrast focus preferences.
+- Signed private update checks and packages served through the self-hosted Tailnet service.
 
 ### Excluded
 
@@ -29,7 +30,7 @@ The client consumes a Stremio account and its already-configured addons. Addon i
 - Official app-store publication.
 - Portrait tablet layouts and tablet keyboard/trackpad-specific layouts.
 - Public internet exposure or a second pairing mechanism beyond Tailscale membership.
-- Signed Android distribution, automatic app updates, Android TV home recommendations, operating-system media sessions, further LG Magic Remote calibration and crash reporting.
+- Android TV home recommendations, operating-system media sessions, further LG Magic Remote calibration and crash reporting.
 
 ## External dependencies
 
@@ -115,7 +116,7 @@ Automatic source selection follows this order:
 4. Prefer sources that previously played successfully for this profile and penalise repeated failures or stalls.
 5. Prefer sources with a healthy swarm (at least 15 peers), then the strongest quality available within the device ceiling.
 6. Rank otherwise suitable sources by user availability, such as peers or seed count when the addon exposes it.
-5. Apply the preferred subtitle language when available; subtitles are optional and never prevent automatic playback.
+7. Apply the preferred subtitle language when available; subtitles are optional and never prevent automatic playback.
 
 If no source fits the quality ceiling, the app shows every available source for manual selection. It must not silently relax the ceiling.
 
@@ -157,6 +158,16 @@ Individual addon failures are silent when other addons return usable results. If
 - Every actionable television element has an unambiguous visible focus state.
 - Both themes maintain readable contrast. Profile preferences provide text scaling, reduced motion and a stronger focus treatment, while controls expose screen-reader names and status does not rely on colour alone.
 
+## Private updates
+
+- A device-level setting enables automatic checks at launch and every six hours.
+- The profile service exposes a signed manifest and same-origin packages through its private `/downloads` path.
+- Clients reject unsigned manifests, unexpected package sizes, checksum mismatches and cross-origin package addresses.
+- Linux installs a verified per-user version, retains two local versions and restarts into the update.
+- Android releases use one stable private signing identity. Android always presents its package-installation confirmation.
+- LG reports an available IPK but cannot install it without webOS Developer Mode tools.
+- The Windows deployment retains only the current and previous package sets.
+
 ## Theme behaviour
 
 - Light is the default theme.
@@ -185,6 +196,10 @@ At 21:59 in Scheduled mode, the next episode may autoplay. At 22:00 or later it 
 ### Multi-profile isolation
 
 Two profiles use the same Stremio account and addon configuration. Their Saved collections, progress, history, preferences, feedback, and recommendations remain independent and synchronise across authorised tailnet clients.
+
+### Private update
+
+A newer signed manifest is published on the Tailnet service. Still reports the update automatically. Linux verifies, installs and restarts; Android verifies the APK before handing it to the system installer; LG reports the version for manual Developer Mode installation.
 
 ## Deliberately flexible implementation decisions
 

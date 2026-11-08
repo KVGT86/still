@@ -37,7 +37,25 @@ import { Player } from "./Player";
 import { LoadScreen } from "./LoadScreen";
 import { Icon, Avatar, avatarOptions, type IconName } from "./Icon";
 import { playInterfaceSound } from "./sounds";
+import {
+  appVersion,
+  checkForUpdate,
+  updatePlatform,
+  type AvailableUpdate,
+} from "./updates";
 import "./style.css";
+type UpdateStatus = {
+  phase:
+    | "idle"
+    | "checking"
+    | "current"
+    | "available"
+    | "installing"
+    | "error"
+    | "permission";
+  message: string;
+  available?: AvailableUpdate;
+};
 const demoMeta: Meta = {
   id: "still-demo",
   type: "movie",
@@ -264,7 +282,17 @@ function App() {
     ),
     [streamingServer, setStreamingServer] = useState(
       readLocal("still.streamingServer", ""),
-    );
+    ),
+    [updateServer, setUpdateServer] = useState(
+      readLocal("still.updateServer", ""),
+    ),
+    [automaticUpdates, setAutomaticUpdates] = useState(
+      readLocal("still.automaticUpdates", true),
+    ),
+    [updateStatus, setUpdateStatus] = useState<UpdateStatus>({
+      phase: "idle",
+      message: "Updates have not been checked on this device.",
+    });
   const { state, update, syncStatus, syncInfo, conflict, resolveConflict } =
     useProfileStore(
       session,
@@ -335,7 +363,103 @@ function App() {
     [target, setTarget] = useState<Profile | null>(null);
   const requestId = useRef(0);
   const sourceRequest = useRef<AbortController | null>(null);
+  const effectiveUpdateServer = updateServer.trim() || service.trim();
+  async function performUpdateCheck() {
+    if (!updatePlatform()) {
+      setUpdateStatus({
+        phase: "current",
+        message: "The hosted web app updates with the server.",
+      });
+      return;
+    }
+    if (!effectiveUpdateServer) {
+      setUpdateStatus({
+        phase: "idle",
+        message: "Add your private update service to check this device.",
+      });
+      return;
+    }
+    setUpdateStatus((current) => ({
+      ...current,
+      phase: "checking",
+      message: "Checking the private update service…",
+    }));
+    try {
+      const available = await checkForUpdate(effectiveUpdateServer);
+      setUpdateStatus(
+        available
+          ? {
+              phase: "available",
+              message:
+                updatePlatform() === "webos"
+                  ? `Still ${available.version} is ready for LG Developer Mode installation.`
+                  : `Still ${available.version} is ready to install.`,
+              available,
+            }
+          : {
+              phase: "current",
+              message: `Still ${appVersion} is up to date.`,
+            },
+      );
+    } catch (cause) {
+      setUpdateStatus({ phase: "error", message: message(cause) });
+    }
+  }
+  async function installAppUpdate() {
+    const available = updateStatus.available;
+    if (!available) return;
+    setUpdateStatus({
+      ...updateStatus,
+      phase: "installing",
+      message:
+        updatePlatform() === "android"
+          ? "Downloading and verifying the Android update…"
+          : "Downloading and verifying the Linux update…",
+    });
+    try {
+      if (window.StillDesktop)
+        await window.StillDesktop.installUpdate({
+          version: available.version,
+          ...available.package,
+        });
+      else if (window.StillNative)
+        window.StillNative.installUpdate(
+          JSON.stringify({ version: available.version, ...available.package }),
+        );
+    } catch (cause) {
+      setUpdateStatus({
+        phase: "error",
+        message: `${message(cause)} Try again from Settings.`,
+        available,
+      });
+    }
+  }
   useEffect(() => () => sourceRequest.current?.abort(), []);
+  useEffect(() => {
+    window.stillUpdateStatus = (phase, updateMessage) =>
+      setUpdateStatus((current) => ({
+        ...current,
+        phase:
+          phase === "permission"
+            ? "permission"
+            : phase === "error"
+              ? "error"
+              : phase === "ready"
+                ? "installing"
+                : current.phase,
+        message: updateMessage,
+      }));
+    return () => {
+      delete window.stillUpdateStatus;
+    };
+  }, []);
+  useEffect(() => {
+    if (!automaticUpdates || !effectiveUpdateServer || !updatePlatform())
+      return;
+    void performUpdateCheck();
+    const timer = window.setInterval(performUpdateCheck, 6 * 60 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [automaticUpdates, effectiveUpdateServer]);
   useEffect(() => {
     const highlight = (event: PointerEvent) => {
       const element = (event.target as Element)?.closest<HTMLElement>(
@@ -1057,6 +1181,13 @@ function App() {
                     resolveConflict,
                     streamingServer,
                     setStreamingServer,
+                    updateServer,
+                    setUpdateServer,
+                    automaticUpdates,
+                    setAutomaticUpdates,
+                    updateStatus,
+                    performUpdateCheck,
+                    installAppUpdate,
                     service,
                     demo,
                   }}
@@ -2466,6 +2597,70 @@ function Settings(p: any) {
         </Setting>
       </section>
       <section>
+        <h2>Updates</h2>
+        <Setting
+          label="Private update service"
+          text="Leave blank to use the connected household service. Packages stay inside your Tailnet."
+        >
+          <input
+            aria-label="Private update service address"
+            type="url"
+            placeholder={p.service || "https://still-host:9443"}
+            value={p.updateServer}
+            onChange={(event) => {
+              p.setUpdateServer(event.target.value);
+              localStorage.setItem(
+                "still.updateServer",
+                JSON.stringify(event.target.value),
+              );
+            }}
+          />
+        </Setting>
+        <Setting
+          label="Automatic update checks"
+          text="Checks at launch and every six hours. Android always asks before installation."
+        >
+          <button
+            className="toggle"
+            role="switch"
+            aria-label="Automatic update checks"
+            aria-checked={p.automaticUpdates}
+            onClick={() => {
+              const value = !p.automaticUpdates;
+              p.setAutomaticUpdates(value);
+              localStorage.setItem(
+                "still.automaticUpdates",
+                JSON.stringify(value),
+              );
+            }}
+          >
+            <span />
+          </button>
+        </Setting>
+        <Setting label={`Still ${appVersion}`} text={p.updateStatus.message}>
+          <div className="update-actions">
+            <button
+              disabled={
+                p.updateStatus.phase === "checking" ||
+                p.updateStatus.phase === "installing"
+              }
+              onClick={() => void p.performUpdateCheck()}
+            >
+              {p.updateStatus.phase === "checking" ? "Checking…" : "Check now"}
+            </button>
+            {p.updateStatus.available && updatePlatform() !== "webos" && (
+              <button
+                className="primary-action"
+                disabled={p.updateStatus.phase === "installing"}
+                onClick={() => void p.installAppUpdate()}
+              >
+                {window.StillDesktop ? "Install and restart" : "Install update"}
+              </button>
+            )}
+          </div>
+        </Setting>
+      </section>
+      <section>
         <h2>Sync and storage</h2>
         <div className="health-grid" role="status">
           <div>
@@ -2530,10 +2725,12 @@ function Settings(p: any) {
                 : "Not synced yet"}
             </span>
           </div>
-          {health?.version && health.version !== "0.3.0" && (
+          {health?.version && health.version !== appVersion && (
             <div>
               <strong>Host update recommended</strong>
-              <span>App 0.3.0, host {health.version}</span>
+              <span>
+                App {appVersion}, host {health.version}
+              </span>
             </div>
           )}
         </div>
@@ -2758,7 +2955,7 @@ function Settings(p: any) {
         )}
       </section>
       <p className="fine-print">
-        Still 0.3.0 · An independent Stremio client.
+        Still {appVersion} · An independent Stremio client.
         <br />
         Configured addons supply catalogues and sources. No content is hosted by
         Still.

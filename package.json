@@ -1,6 +1,6 @@
 {
   "name": "still-client",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",
@@ -19,6 +19,8 @@
     "package:webos": "node scripts/package-webos.mjs",
     "package:android": "npm run build && node scripts/sync-android.mjs",
     "package:linux": "npm run build && node scripts/package-linux.mjs",
+    "updates:init": "node scripts/init-update-keys.mjs",
+    "package:updates": "node scripts/package-updates.mjs",
     "desktop": "electron desktop/main.cjs",
     "install:desktop": "node scripts/install-desktop.mjs",
     "test:desktop": "node scripts/test-desktop.mjs",

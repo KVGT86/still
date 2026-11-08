@@ -33,6 +33,7 @@ The app is operated in landscape with a TV remote, LG Magic Remote, touch or key
 - Playback marks a title complete at 95% and shows Continue Watching after 2%.
 - One profile can rely on Stremio. Multiple profiles require the self-hosted Still service and sync across connected devices.
 - Distribution is by sideloading. Still does not provide illegal torrents or content.
+- Devices may check a signed private update service on the Tailnet. Linux installs directly, Android confirms through the system installer, and LG remains a Developer Mode installation.
 - British spelling is required in user-facing and repository prose. Em dashes are not used.
 
 ## Brand Commitments
