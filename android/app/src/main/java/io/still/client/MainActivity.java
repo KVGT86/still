@@ -15,7 +15,7 @@ public class MainActivity extends Activity {
  private WebView web;
  private java.io.File pendingUpdate;
  private boolean openingInstallPermission;
- @Override public void onCreate(Bundle state){super.onCreate(state);current=this;getWindow().setFlags(1024,1024);web=new WebView(this);setContentView(web);
+ @Override public void onCreate(Bundle state){super.onCreate(state);current=this;getWindow().setFlags(1024,1024);web=new WebView(this);setContentView(web);WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0);
   web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);web.getSettings().setMediaPlaybackRequiresUserGesture(false);web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);web.getSettings().setSafeBrowsingEnabled(true);
   WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
   web.setWebViewClient(new WebViewClient(){@Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){return loader.shouldInterceptRequest(request.getUrl());}@Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){return !request.getUrl().toString().startsWith("https://appassets.androidplatform.net/");}});

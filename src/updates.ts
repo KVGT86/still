@@ -36,7 +36,7 @@ export async function checkForUpdate(
     base.hash
   )
     throw new Error("Use a plain HTTP or HTTPS update service address.");
-  const manifestUrl = new URL("downloads/manifest.json", base.href + "/");
+  const manifestUrl = new URL("downloads/manifest.json", base.href.replace(/\/?$/, "/"));
   const response = await fetch(manifestUrl, {
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),

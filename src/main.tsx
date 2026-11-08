@@ -339,6 +339,7 @@ function App() {
     [stage, setStage] = useState({ label: "", floor: 0, ceil: 0.3 });
   const [sourceSortOverride, setSourceSortOverride] = useState("");
   const [savedCollection, setSavedCollection] = useState("");
+  const [managingProfiles, setManagingProfiles] = useState(false);
   const [sources, setSources] = useState<{
       meta: Meta;
       videoId: string;
@@ -1066,7 +1067,7 @@ function App() {
                     <strong>{p.name}</strong>
                     {p.locked && <small>PIN protected</small>}
                   </button>
-                  {service && profiles.length > 1 && (
+                  {managingProfiles && service && profiles.length > 1 && (
                     <div
                       className="profile-order"
                       aria-label={`Reorder ${p.name}`}
@@ -1089,7 +1090,7 @@ function App() {
                   )}
                 </div>
               ))}
-              {service && (
+              {managingProfiles && service && (
                 <button
                   className="profile-tile add-profile"
                   onClick={() => setDialog("create")}
@@ -1102,6 +1103,14 @@ function App() {
               )}
             </div>
             <div className="profile-actions">
+              {service && (
+                <button
+                  aria-expanded={managingProfiles}
+                  onClick={() => setManagingProfiles((value) => !value)}
+                >
+                  {managingProfiles ? "Done" : "Manage profiles"}
+                </button>
+              )}
               <button onClick={() => setDialog("service")}>
                 {service ? "Connection settings" : "Set up household profiles"}
               </button>
@@ -1143,6 +1152,7 @@ function App() {
             <button
               className="account"
               onClick={() => {
+                setManagingProfiles(false);
                 setActive(null);
                 if (demo) {
                   setDemo(false);
