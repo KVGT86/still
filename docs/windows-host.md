@@ -28,10 +28,13 @@ Copy these files onto the Windows PC:
 - `scripts/windows/start-host.ps1` → `E:\Still\start-host.ps1`
 - `scripts/windows/setup-host.ps1` → `E:\Still\setup-host.ps1`
 - `scripts/windows/deploy-update.ps1` → `E:\Still\deploy-update.ps1`
+- `scripts/windows/update-host.ps1` → `E:\Still\update-host.ps1`
 
 Run `setup-storage.ps1` in Administrator PowerShell. Put `artifacts/host/still-host.tar.gz` inside `E:\Still\Volume`, then run `setup-host.ps1`.
 
 The setup installs a SYSTEM scheduled task named **StillHost**, triggered at boot, without storing a user password. The task mounts the VHDX and supervises the profile service and existing Stremio engine. Both HTTP listeners bind to `127.0.0.1`. Tailscale Serve publishes two private HTTPS endpoints on the PC's MagicDNS name:
+
+When `update-host.ps1` is present, setup also installs **StillHostUpdate**. It checks the public GitHub release feed at startup and every six hours. A newer stable release is downloaded before any service interruption, every asset is checked against GitHub's SHA-256 digest, and the new host must pass its local health check. A failed health check restores the previous application. The database, backups and Stremio runtime remain outside the replaced application directory.
 
 | Port | Purpose                                                    |
 | ---- | ---------------------------------------------------------- |

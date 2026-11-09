@@ -280,7 +280,14 @@ test("household profile chooser contains no real account data", async ({
   await expect(
     page.getByRole("button", { name: "Guest PIN protected" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add profile" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Move later" })).toHaveCount(0);
   await capture(page, "artifacts/profiles-light.png");
+  await page.getByRole("button", { name: "Manage profiles" }).click();
+  await expect(page.getByRole("button", { name: "Add profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Move later" })).toHaveCount(2);
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("button", { name: "Add profile" })).toBeHidden();
   await page.evaluate(() => {
     document.documentElement.dataset.theme = "dark";
   });

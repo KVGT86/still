@@ -36,6 +36,10 @@ for (const platform of Object.keys(sources)) {
     bytes: (await stat(target)).size,
   };
 }
+const hostName = `Still-${version}-host.tar.gz`;
+await cp("artifacts/host/still-host.tar.gz", join(output, hostName)).catch(() => {
+  throw new Error("Build the host package before packaging updates.");
+});
 const payload = {
   schema: 1,
   version,

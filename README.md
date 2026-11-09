@@ -163,14 +163,14 @@ The x86-64 Linux builds are in `artifacts/linux/`: a portable `.tar.gz`, a Debia
 Install the Debian package on Debian or Ubuntu:
 
 ```sh
-sudo apt install ./artifacts/linux/Still-0.4.1-linux-amd64.deb
+sudo apt install ./artifacts/linux/Still-0.4.2-linux-amd64.deb
 ```
 
 Or extract and run the portable package:
 
 ```sh
 mkdir -p Still
-tar -xzf artifacts/linux/Still-0.4.1-linux-x64.tar.gz -C Still
+tar -xzf artifacts/linux/Still-0.4.2-linux-x64.tar.gz -C Still
 ./Still/still
 ```
 
@@ -229,7 +229,7 @@ The initial engine target is **webOS 22+** (Chromium 87+); exact codec and firmw
 npm ci
 npm run package:webos
 tools/webos/node_modules/.bin/ares-setup-device
-tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.4.1_all.ipk
+tools/webos/node_modules/.bin/ares-install -d YOUR_TV artifacts/webos/io.still.client_0.4.2_all.ipk
 tools/webos/node_modules/.bin/ares-launch -d YOUR_TV io.still.client
 ```
 
@@ -260,6 +260,7 @@ set -a
 set +a
 (cd android && JAVA_HOME=/path/to/jdk17 ANDROID_HOME=/path/to/android-sdk sh gradlew assembleRelease)
 npm run package:webos
+npm run package:host
 npm run package:updates
 ```
 
@@ -270,6 +271,8 @@ Copy `artifacts/updates/` and `scripts/windows/deploy-update.ps1` to the Windows
 ```
 
 The script verifies every checksum, publishes `manifest.json` last and retains only the current and previous package sets in `E:\Still\Volume\Packages`. A complete update set uses about 125 MiB, so retention remains well inside the host's storage cap.
+
+Copy `scripts/windows/update-host.ps1` to `E:\Still\update-host.ps1` and run `setup-host.ps1` again to enable server updates. The SYSTEM task checks this repository's public GitHub releases at startup and every six hours. It accepts only stable semantic versions with all expected assets and GitHub SHA-256 digests, verifies the replacement locally, rolls back an unhealthy host and never replaces `Data`, `Backups` or `Runtime`.
 
 Back up `~/.config/still/keys` somewhere private. It contains both signing identities and must never be committed or copied into the public downloads directory. Clients contain only the non-secret update verification key.
 

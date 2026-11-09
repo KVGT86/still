@@ -42,6 +42,16 @@ $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccou
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName 'StillHost' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Still profiles and the installed Stremio engine, using the capped E: volume and Tailscale-only access.' -Force | Out-Null
 Start-ScheduledTask -TaskName 'StillHost'
+$updateScript = Join-Path $Root 'update-host.ps1'
+if (Test-Path $updateScript) {
+    $updateAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File E:\Still\update-host.ps1'
+    $updateTriggers = @(
+        (New-ScheduledTaskTrigger -AtStartup),
+        (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Hours 6))
+    )
+    $updateSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskName 'StillHostUpdate' -Action $updateAction -Trigger $updateTriggers -Principal $principal -Settings $updateSettings -Description 'Checks the public Still GitHub releases every six hours and installs verified host and client packages.' -Force | Out-Null
+}
 $serve = & tailscale serve status --json | ConvertFrom-Json
 foreach ($pair in @(@(9443,8787),@(9444,11470))) {
     $port=$pair[0]; $target="http://127.0.0.1:$($pair[1])"
