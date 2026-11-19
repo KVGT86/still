@@ -14,9 +14,11 @@ const {
   createReadStream,
   createWriteStream,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   realpathSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } = require("node:fs");
@@ -82,33 +84,7 @@ function validateExtractedTree(root, directory = root) {
     if (entry.isDirectory()) validateExtractedTree(root, item);
   }
 }
-async function installUpdate(update) {
-  if (process.platform !== "linux" || process.arch !== "x64")
-    throw new Error("Automatic updates require 64-bit Linux.");
-  if (
-    !update ||
-    typeof update.version !== "string" ||
-    !newerVersion(update.version, app.getVersion()) ||
-    typeof update.url !== "string" ||
-    !/^[a-f0-9]{64}$/.test(update.sha256) ||
-    !Number.isSafeInteger(update.bytes) ||
-    update.bytes < 1 ||
-    update.bytes > 500 * 1024 * 1024
-  )
-    throw new Error("The update package is invalid.");
-  const url = new URL(update.url);
-  if (
-    !["http:", "https:"].includes(url.protocol) ||
-    url.username ||
-    url.password
-  )
-    throw new Error("The update address is invalid.");
-  const updates = path.join(app.getPath("userData"), "updates");
-  const versions = path.join(app.getPath("userData"), "versions");
-  mkdirSync(updates, { recursive: true });
-  mkdirSync(versions, { recursive: true });
-  const archive = path.join(updates, `Still-${update.version}.tar.gz`);
-  rmSync(archive, { force: true });
+async function downloadUpdate(url, archive, update) {
   const response = await net.fetch(url.href, { redirect: "error" });
   if (!response.ok || !response.body)
     throw new Error("The update package could not be downloaded.");
@@ -134,6 +110,51 @@ async function installUpdate(update) {
     (await fileDigest(archive)) !== update.sha256
   )
     throw new Error("The update package failed verification.");
+}
+
+async function installUpdate(update) {
+  const mac = process.platform === "darwin" && process.arch === "arm64";
+  if (!mac && (process.platform !== "linux" || process.arch !== "x64"))
+    throw new Error("Updates require Apple Silicon or 64-bit Linux.");
+  if (
+    !update ||
+    typeof update.version !== "string" ||
+    !newerVersion(update.version, app.getVersion()) ||
+    typeof update.url !== "string" ||
+    !/^[a-f0-9]{64}$/.test(update.sha256) ||
+    !Number.isSafeInteger(update.bytes) ||
+    update.bytes < 1 ||
+    update.bytes > 500 * 1024 * 1024
+  )
+    throw new Error("The update package is invalid.");
+  const url = new URL(update.url);
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password
+  )
+    throw new Error("The update address is invalid.");
+  const updates = path.join(app.getPath("userData"), "updates");
+  mkdirSync(updates, { recursive: true, mode: 0o700 });
+  if (mac) {
+    const staging = mkdtempSync(path.join(updates, ".download-"));
+    const temporary = path.join(staging, "download.zip");
+    const archive = path.join(updates, `Still-${update.version}-mac-arm64.zip`);
+    try {
+      await downloadUpdate(url, temporary, update);
+      renameSync(temporary, archive);
+    } finally {
+      rmSync(staging, { recursive: true, force: true });
+    }
+    shell.showItemInFolder(archive);
+    return;
+  }
+
+  const versions = path.join(app.getPath("userData"), "versions");
+  mkdirSync(versions, { recursive: true });
+  const archive = path.join(updates, `Still-${update.version}.tar.gz`);
+  rmSync(archive, { force: true });
+  await downloadUpdate(url, archive, update);
   const members = execFileSync("tar", ["-tzf", archive], {
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,

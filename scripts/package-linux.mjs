@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { icon } from "./shared-icon.mjs";
 await mkdir("desktop", { recursive: true });
-await writeFile("desktop/icon.png", icon(512));
+await writeFile("desktop/icon.png", icon(1024));
 const stage = "artifacts/linux/app";
 await rm(stage, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });

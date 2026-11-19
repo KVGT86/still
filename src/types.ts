@@ -119,7 +119,9 @@ export type Addon = {
 declare global {
   interface Window {
     StillDesktop?: {
-      engineURL: () => Promise<string>;
+      platform: string;
+      updatePlatform: "linux" | "mac-arm64" | null;
+      engineURL?: () => Promise<string>;
       installUpdate: (update: {
         version: string;
         url: string;

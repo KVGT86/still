@@ -15,6 +15,11 @@ test("signed update manifests accept newer same-origin packages", async () => {
     publishedAt: new Date().toISOString(),
     packages: {
       android: { url: "Still-1.2.0.apk", sha256: "a".repeat(64), bytes: 42 },
+      "mac-arm64": {
+        url: "Still-1.2.0-mac-arm64.zip",
+        sha256: "b".repeat(64),
+        bytes: 128,
+      },
     },
   };
   const signature = Buffer.from(
@@ -36,6 +41,18 @@ test("signed update manifests accept newer same-origin packages", async () => {
     update.package.url,
     "https://still.test/downloads/Still-1.2.0.apk",
   );
+  const macUpdate = await verifyUpdateManifest(
+    JSON.stringify({ payload, signature }),
+    "1.1.9",
+    "mac-arm64",
+    "https://still.test/downloads/manifest.json",
+    await webcrypto.subtle.exportKey("jwk", pair.publicKey),
+  );
+  assert.deepEqual(macUpdate.package, {
+    url: "https://still.test/downloads/Still-1.2.0-mac-arm64.zip",
+    sha256: "b".repeat(64),
+    bytes: 128,
+  });
   assert.equal(compareVersions("1.10.0", "1.9.9"), 1);
   payload.packages.android.url = "https://elsewhere.test/update.apk";
   await assert.rejects(

@@ -27,7 +27,7 @@ try {
     return { desktopName: metadata.desktopName, iconSize: image.getSize() };
   });
   assert.equal(desktopIdentity.desktopName, "io.still.client");
-  assert.deepEqual(desktopIdentity.iconSize, { width: 512, height: 512 });
+  assert.deepEqual(desktopIdentity.iconSize, { width: 1024, height: 1024 });
   await page.getByRole("heading", { name: "Sign in to Stremio" }).waitFor();
   assert.equal(await page.evaluate(() => typeof window.require), "undefined");
   await page.getByRole("button", { name: "Preview app" }).click();
@@ -44,10 +44,11 @@ try {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
-  await mkdir("artifacts/linux", { recursive: true });
-  await page.screenshot({ path: "artifacts/linux/desktop-smoke.png" });
+  const output = process.platform === "darwin" ? "artifacts/mac" : "artifacts/linux";
+  await mkdir(output, { recursive: true });
+  await page.screenshot({ path: `${output}/desktop-smoke.png` });
   console.log(
-    "Linux desktop smoke test passed: secure renderer, sign-in, preview, navigation and themes.",
+    "Desktop smoke test passed: secure renderer, sign-in, preview, navigation and themes.",
   );
 } finally {
   await app.close();

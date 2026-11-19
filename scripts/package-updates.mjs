@@ -20,6 +20,10 @@ const names = {
   android: `Still-${version}-android.apk`,
   webos: `io.still.client_${version}_all.ipk`,
 };
+if (process.argv.includes("--mac")) {
+  names["mac-arm64"] = `Still-${version}-mac-arm64.zip`;
+  sources["mac-arm64"] = `artifacts/mac/${names["mac-arm64"]}`;
+}
 const output = "artifacts/updates";
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });

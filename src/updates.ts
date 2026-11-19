@@ -1,7 +1,7 @@
 import { updatePublicKey } from "./update-public-key";
 import { compareVersions, verifyUpdateManifest } from "../shared/updates.mjs";
 
-export type UpdatePlatform = "linux" | "android" | "webos";
+export type UpdatePlatform = "linux" | "mac-arm64" | "android" | "webos";
 export type UpdatePackage = {
   url: string;
   sha256: string;
@@ -16,7 +16,7 @@ export type AvailableUpdate = {
 export const appVersion = __APP_VERSION__;
 
 export function updatePlatform(): UpdatePlatform | null {
-  if (window.StillDesktop) return "linux";
+  if (window.StillDesktop) return window.StillDesktop.updatePlatform;
   if (window.StillNative) return "android";
   if (window.PalmSystem || "webOSSystem" in window) return "webos";
   return null;

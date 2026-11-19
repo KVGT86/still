@@ -169,18 +169,23 @@ function deviceIdentity() {
     id = crypto.randomUUID();
     localStorage.setItem("still.deviceId", id);
   }
+  const mac = window.StillDesktop?.platform === "darwin";
   return {
     id,
     name: window.StillNative
       ? "Android device"
-      : window.StillDesktop
-        ? "Linux computer"
-        : "Web device",
+      : mac
+        ? "Mac"
+        : window.StillDesktop
+          ? "Linux computer"
+          : "Web device",
     platform: window.StillNative
       ? "Android"
-      : window.StillDesktop
-        ? "Linux"
-        : "Web",
+      : mac
+        ? "macOS"
+        : window.StillDesktop
+          ? "Linux"
+          : "Web",
   };
 }
 function ContinueCard({
@@ -369,7 +374,9 @@ function App() {
     if (!updatePlatform()) {
       setUpdateStatus({
         phase: "current",
-        message: "The hosted web app updates with the server.",
+        message: window.StillDesktop
+          ? "Private updates are unavailable for this desktop build."
+          : "The hosted web app updates with the server.",
       });
       return;
     }
@@ -412,18 +419,21 @@ function App() {
     setUpdateStatus({
       ...updateStatus,
       phase: "installing",
-      message:
-        updatePlatform() === "android"
-          ? "Downloading and verifying the Android update…"
-          : "Downloading and verifying the Linux update…",
+      message: "Downloading and verifying the update…",
     });
     try {
-      if (window.StillDesktop)
+      if (window.StillDesktop) {
         await window.StillDesktop.installUpdate({
           version: available.version,
           ...available.package,
         });
-      else if (window.StillNative)
+        if (updatePlatform() === "mac-arm64") {
+          setUpdateStatus({
+            phase: "current",
+            message: "Verified ZIP shown in Finder. Unzip it, quit Still, then replace Still.app with the new copy.",
+          });
+        }
+      } else if (window.StillNative)
         window.StillNative.installUpdate(
           JSON.stringify({ version: available.version, ...available.package }),
         );
@@ -2304,11 +2314,10 @@ function Settings(p: any) {
   useEffect(() => {
     let alive = true;
     const check = async () => {
-      const base =
-        p.streamingServer ||
-        (window.StillDesktop ? await window.StillDesktop.engineURL() : "");
-      if (!base) return alive && setEngineOnline(null);
       try {
+        const base =
+          p.streamingServer || (await window.StillDesktop?.engineURL?.());
+        if (!base) return alive && setEngineOnline(null);
         const response = await fetch(api.safeBase(base) + "/settings", {
           signal: AbortSignal.timeout(4000),
         });
@@ -2586,7 +2595,7 @@ function Settings(p: any) {
         <Setting
           label="Stremio streaming server"
           text={
-            window.StillDesktop
+            window.StillDesktop?.engineURL
               ? "Leave blank for the local engine. Installs on first torrent."
               : "Needed for torrent-only sources. Use a reachable Stremio engine."
           }
@@ -2664,7 +2673,11 @@ function Settings(p: any) {
                 disabled={p.updateStatus.phase === "installing"}
                 onClick={() => void p.installAppUpdate()}
               >
-                {window.StillDesktop ? "Install and restart" : "Install update"}
+                {updatePlatform() === "mac-arm64"
+                  ? "Download update"
+                  : window.StillDesktop
+                    ? "Install and restart"
+                    : "Install update"}
               </button>
             )}
           </div>

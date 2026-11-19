@@ -151,6 +151,14 @@ The service verifies the signed-in Stremio account, stores hashed short-lived se
 
 An LG TV needs a route to the tailnet address through your network: installing the app does not install Tailscale on webOS. Use a Tailscale-capable gateway/router or another network arrangement that makes the server reachable. Android devices can use their normal Tailscale client.
 
+## macOS desktop (Apple Silicon)
+
+Use native ARM64 Node.js 22.16 or newer. From the checkout, run `npm ci`, `npm run build`, and `npm run desktop`. In a macOS graphical session, `npm run test:desktop` checks the renderer, preview, navigation and theme controls.
+
+On a Mac, `npm run package:mac` builds an ARM64 `Still.app` and a versioned ZIP under `artifacts/mac/`. The build validates the app name, bundle ID, Apple Silicon executable and packaged icon before creating the ZIP. Unzip the package and move Still to Applications. For distribution, configure electron-builder with a Developer ID Application certificate and Apple notarization credentials so Gatekeeper can verify the app.
+
+The macOS app has its own local profile and session data. To play torrent-only sources, set **Settings → Stremio streaming server** to a reachable engine. If you already run the official Stremio service on your Mac, try `http://127.0.0.1:11470`. Still's optional profile-sync service uses a different address.
+
 ## Linux desktop
 
 ```sh
@@ -246,11 +254,12 @@ The LG app cannot run Tailscale itself. Use the Windows host's explicitly enable
 Still checks a signed manifest from the existing profile-service address, or from a separate address entered under **Settings → Private update service**. Checks run at launch and every six hours when enabled.
 
 - Linux verifies the signed manifest and package checksum, installs into a per-user version directory, updates the launcher, retains two local versions and restarts into the new build.
+- Apple Silicon macOS verifies the signed manifest and ZIP checksum, then reveals the ZIP in Finder. Unzip it, quit Still, and replace the existing Still.app.
 - Android verifies and downloads the signed APK, then opens Android's required installation confirmation. The first update also asks permission for Still to install packages.
 - LG verifies and reports an available IPK. webOS Developer Mode does not allow the app to install itself, so use `ares-install` from another computer.
 - The hosted web client changes with the server and needs no separate update.
 
-Build all three packages and the signed server bundle:
+Build the Linux, Android and webOS packages and the signed server bundle:
 
 ```sh
 npm run package:linux
@@ -264,13 +273,15 @@ npm run package:host
 npm run package:updates
 ```
 
+To include Apple Silicon macOS, run `npm run package:mac` on a Mac, copy its same-version ZIP to `artifacts/mac/` on the release machine, and run `npm run package:updates -- --mac`. Include the ZIP alongside the manifest in the release.
+
 Copy `artifacts/updates/` and `scripts/windows/deploy-update.ps1` to the Windows host, then run:
 
 ```powershell
 .\deploy-update.ps1 -Source C:\path\to\updates
 ```
 
-The script verifies every checksum, publishes `manifest.json` last and retains only the current and previous package sets in `E:\Still\Volume\Packages`. A complete update set uses about 125 MiB, so retention remains well inside the host's storage cap.
+The script verifies every checksum, publishes `manifest.json` last and retains only the current and previous package sets in `E:\Still\Volume\Packages`. Including macOS increases the space needed to retain two releases.
 
 Copy `scripts/windows/update-host.ps1` to `E:\Still\update-host.ps1` and run `setup-host.ps1` again to enable server updates. The SYSTEM task checks this repository's public GitHub releases at startup and every six hours. It accepts only stable semantic versions with all expected assets and GitHub SHA-256 digests, verifies the replacement locally, rolls back an unhealthy host and never replaces `Data`, `Backups` or `Runtime`.
 

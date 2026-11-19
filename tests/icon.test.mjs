@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Resvg } from "@resvg/resvg-js";
 import { appIconSvg, icon, tvBanner } from "../scripts/shared-icon.mjs";
 test("shared squircle icon renders at every platform size with transparent corners", () => {
-  for (const size of [16, 32, 48, 128, 130, 192, 256, 512]) {
+  for (const size of [16, 32, 48, 128, 130, 192, 256, 512, 1024]) {
     const png = icon(size);
     assert.equal(png.readUInt32BE(16), size);
     assert.equal(png.readUInt32BE(20), size);

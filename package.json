@@ -18,6 +18,7 @@
     "check": "npm test && npm run build",
     "package:webos": "node scripts/package-webos.mjs",
     "package:android": "npm run build && node scripts/sync-android.mjs",
+    "package:mac": "npm run build && node scripts/package-mac.mjs",
     "package:linux": "npm run build && node scripts/package-linux.mjs",
     "package:host": "npm run build && node scripts/package-host.mjs",
     "updates:init": "node scripts/init-update-keys.mjs",

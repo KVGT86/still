@@ -391,7 +391,7 @@ export async function resolvePlayUrl(
   ) {
     const base = server.trim()
       ? safeBase(server.trim())
-      : await window.StillDesktop?.engineURL();
+      : await window.StillDesktop?.engineURL?.();
     if (!base) return playUrl(stream, "");
     const media = playUrl(stream, base);
     return torrentHlsUrl(media, base, crypto.randomUUID());

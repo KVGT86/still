@@ -57,6 +57,14 @@ try {
         Download-Asset $asset[0] (Join-Path $temp $name)
     }
 
+    $manifest = Get-Content (Join-Path $temp 'manifest.json') -Raw | ConvertFrom-Json
+    if ($manifest.payload.packages.PSObject.Properties['mac-arm64']) {
+        $macName = "Still-$version-mac-arm64.zip"
+        $asset = @($release.assets | Where-Object name -eq $macName)
+        if ($asset.Count -ne 1) { throw "Release $version must contain exactly one $macName asset." }
+        Download-Asset $asset[0] (Join-Path $temp $macName)
+    }
+
     Remove-Item $next -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force $next | Out-Null
     & tar.exe -xzf (Join-Path $temp "Still-$version-host.tar.gz") -C $next
